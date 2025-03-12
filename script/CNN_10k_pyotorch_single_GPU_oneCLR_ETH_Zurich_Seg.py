@@ -15,12 +15,13 @@ from torch.utils.data import Dataset
 
 # Paths and constants
 checkpoint_path = "/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/Checkpoint"
-data_path = "/net/scratch/ssoltani/knossos_data/workshop/11_FloraMask/2_Unet_on_flora_mask/4_F_Japonica/"
+data_path = "/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/data/"
 num_img_per_class = 4000
 batch_size = 16
 num_epochs = 150
 num_classes = 6
 image_size = 512  # Manually set image size
+GPU_index = 'cuda:2'
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -74,7 +75,7 @@ class CustomImageFolder(Dataset):
         return image, target
 
 def prepare_device():
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device( GPU_index if torch.cuda.is_available() else 'cpu')
     torch.cuda.set_device(device)
     return device
 
