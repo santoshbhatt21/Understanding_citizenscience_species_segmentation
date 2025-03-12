@@ -12,6 +12,8 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.tensorboard import SummaryWriter
 from PIL import Image
 from torch.utils.data import Dataset
+from torchvision.datasets import ImageFolder 
+from torchmetrics import Accuracy, MeanMetric
 
 # Paths and constants
 checkpoint_path = "/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/Checkpoint"
@@ -24,80 +26,34 @@ image_size = 512  # Manually set image size
 GPU_index = 'cuda:2'
 
 # Initialize logger
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
 
-
-class CustomImageFolder(Dataset):
-    def __init__(self, root, transform=None):
-        self.root = root
-        self.transform = transform
-        self.classes, self.class_to_idx = self._find_classes(self.root)
-        self.samples = self._make_dataset(self.root, self.class_to_idx)
-        
-    def _find_classes(self, dir):
-        classes = [d.name for d in os.scandir(dir) if d.is_dir()]
-        classes.sort()
-        class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
-        return classes, class_to_idx
-    
-    def _make_dataset(self, dir, class_to_idx):
-        images = []
-        for target_class in sorted(class_to_idx.keys()):
-            class_index = class_to_idx[target_class]
-            target_dir = os.path.join(dir, target_class)
-            if not os.path.isdir(target_dir):
-                continue
-            for root, _, fnames in sorted(os.walk(target_dir)):
-                for fname in sorted(fnames):
-                    path = os.path.join(root, fname)
-                    if self._is_image_file(path):
-                        item = (path, class_index)
-                        images.append(item)
-        return images
-    
-    def _is_image_file(self, filename):
-        extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
-        return any(filename.lower().endswith(ext) for ext in extensions)
-    
-    def __len__(self):
-        return len(self.samples)
-    
-    def __getitem__(self, index):
-        path, target = self.samples[index]
-        image = Image.open(path).convert('RGB')
-        if self.transform is not None:
-            image = self.transform(image)
-        return image, target
-
-def prepare_device():
-    device = torch.device( GPU_index if torch.cuda.is_available() else 'cpu')
-    torch.cuda.set_device(device)
-    return device
-
-def get_data_loaders(data_dir, batch_size, num_img_per_class, image_size):
-    transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.ColorJitter(),
-        transforms.Resize((image_size, image_size)),  # Set the image size
-        transforms.RandomCrop((image_size, image_size)),
-        transforms.ToTensor(),
-        transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-        transforms.RandomErasing(p=0.2, value='random')
+transform = transforms.Compose([
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomVerticalFlip(),
+    transforms.ColorJitter(),
+    transforms.RandomResizedCrop(image_size),  # Handles both resizing and cropping
+    transforms.ToTensor(),
+    transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    transforms.RandomErasing(p=0.2, value='random')
     ])
 
-    dataset = CustomImageFolder(root=data_dir, transform=transform)
+device = torch.device(GPU_index if torch.cuda.is_available() else 'cpu')
+torch.cuda.set_device(device)  # Remove the helper function entirely
+
+def get_data_loaders(data_dir, batch_size, num_img_per_class, image_size):
+
+    dataset = ImageFolder(root=data_dir, transform=transform)
 
     # Count the number of images per class
-    class_counts = np.bincount([s[1] for s in dataset.samples])
-    print("Number of original images per class:")
-    for class_idx, count in enumerate(class_counts):
-        print(f'Class {dataset.classes[class_idx]}: {count} images')
+    class_counts = np.bincount(dataset.targets)  # Directly get counts
+    print("Original images per class:", dict(zip(dataset.classes, class_counts.tolist())))
+    
     
     # Sample a specified number of images per class
     indices = []
@@ -110,9 +66,8 @@ def get_data_loaders(data_dir, batch_size, num_img_per_class, image_size):
         indices.extend(class_indices)
     
     # Shuffle and split indices for training and validation
-    np.random.shuffle(indices)
-    split = int(0.8 * len(indices))
-    train_indices, val_indices = indices[:split], indices[split:]
+    train_size = int(0.8 * len(dataset))
+    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, len(dataset)-train_size])
 
     train_sampler = SubsetRandomSampler(train_indices)
     val_sampler = SubsetRandomSampler(val_indices)
