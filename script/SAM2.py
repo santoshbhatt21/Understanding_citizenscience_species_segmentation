@@ -1,4 +1,3 @@
-
 ##Add the functionality to your code that can read files recursively 
 import os
 import torch
@@ -19,8 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Setup base directory and parameters
-base_dir = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/data_copy/'
-
+base_dir = '/mnt/gsdata/projects/bigplantsens/2_UNET_on_Flora_Mask/4_F_Japonica/data/image/'
 
 Threshold_value = 150
 No_of_sampled_points = 2
@@ -30,14 +28,15 @@ Background_class = 10
 
 # Load models and preprocessing
 model_path = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/Checkpoint/best_model_68_0.02.pth'
-sam_checkpoint = '/mnt/gsdata/projects/bigplantsens/1_FloraMask/4_F_Japonica/checkpoint/F_japonica_cam/sam_vit_h_4b8939.pth'
+# Updated to SAM2 largest model checkpoint
+sam_checkpoint = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/sam2/checkpoints/sam2_hiera_large.pt'
 
 patterns = tuple(['.jpg', '.png', '.JPEG', '.JPG', '.PNG', '.jpeg'])
-
 
 def initialize_model():
     global model, sam, predictor, device, transform
 
+    # Initialize the classification model (EfficientNet)
     model = models.efficientnet_v2_l(weights=None)
     num_ftrs = model.classifier[1].in_features
     model.classifier[1] = nn.Linear(num_ftrs, No_classes)
@@ -53,7 +52,8 @@ def initialize_model():
     model.to(device)
     model.eval()
 
-    sam = sam_model_registry["vit_h"](checkpoint=sam_checkpoint)
+    # Updated: Load SAM2 using its registry key and checkpoint
+    sam = sam_model_registry["sam2_hiera_large"](checkpoint=sam_checkpoint)
     sam.to(device)
     predictor = SamPredictor(sam)
 
@@ -74,12 +74,10 @@ def sample_points_within_contour(contour, num_points):
     sampled_indices = random.sample(range(len(xs)), num_points)
     return [(xs[i] + rect[0], ys[i] + rect[1]) for i in sampled_indices]
 
-
-def process_images_in_batch(image_paths, target_class, threshold_value, num_sampled_points, save_folder):
+def process_images_in_batch(image_paths, target_class, Threshold_value, No_of_sampled_points, save_folder):
     try:
         global model, predictor, transform, device
 
-        # STEP 1: Preprocessing & Activation-Based Prompting
         batch_images = []
         original_images = []
         for image_path in image_paths:
@@ -87,66 +85,52 @@ def process_images_in_batch(image_paths, target_class, threshold_value, num_samp
             original_images.append((image_path, original_image))
             input_tensor = transform(original_image).unsqueeze(0)
             batch_images.append(input_tensor)
+        
         batch_input_tensor = torch.cat(batch_images).to(device)
 
-        # Generate activation maps using GradCAM for the given target class
         cam = GradCAM(model=model, target_layers=[model.features[-1]])
-        grayscale_cams = cam(input_tensor=batch_input_tensor,
-                             targets=[ClassifierOutputTarget(target_class)] * len(image_paths))
+        grayscale_cams = cam(input_tensor=batch_input_tensor, targets=[ClassifierOutputTarget(target_class)] * len(image_paths))
 
-        # Process each image individually
         for idx, (image_path, original_image) in enumerate(original_images):
-            # Resize activation map to original image size and threshold it
             grayscale_cam = grayscale_cams[idx]
             grayscale_cam_resized = cv2.resize(grayscale_cam, original_image.size, interpolation=cv2.INTER_LINEAR)
-            _, binary_map = cv2.threshold(np.uint8(255 * grayscale_cam_resized), threshold_value, 255, cv2.THRESH_BINARY)
-            
-            # Find contours on the binary map to extract candidate regions
+            _, binary_map = cv2.threshold(np.uint8(255 * grayscale_cam_resized), Threshold_value, 255, cv2.THRESH_BINARY)
             contours, _ = cv2.findContours(binary_map, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
-            # Sample points from the activated regions (using your helper function)
+
             all_sampled_points, all_input_labels = [], []
             for contour in contours:
-                sampled_points = sample_points_within_contour(contour, num_sampled_points)
+                sampled_points = sample_points_within_contour(contour, No_of_sampled_points)
                 all_sampled_points.extend(sampled_points)
                 all_input_labels.extend([1] * len(sampled_points))
 
             if all_sampled_points:
-                # STEP 2: Multimask Prediction with SAM
                 predictor.set_image(np.array(original_image))
                 masks, scores, logits = predictor.predict(
                     point_coords=np.array(all_sampled_points),
                     point_labels=np.array(all_input_labels, dtype=np.int32),
-                    multimask_output=True  # Generate several candidate masks
+                    multimask_output=True
                 )
-                
-                # STEP 3: Score-Based Selection & Refinement
-                # Select the mask with the highest score as the candidate for refinement
                 best_mask_index = np.argmax(scores)
                 best_mask_input = logits[best_mask_index, :, :]
-                
-                # Refine the mask by feeding it back into SAM using the best mask as an input
-                refined_mask, _, _ = predictor.predict(
+
+                final_mask, _, _ = predictor.predict(
                     point_coords=np.array(all_sampled_points),
                     point_labels=np.array(all_input_labels, dtype=np.int32),
                     mask_input=best_mask_input[None, :, :],
-                    multimask_output=False  # Only one refined output is needed
+                    multimask_output=False
                 )
-                refined_mask = np.squeeze(refined_mask)
-                
-                # Create final mask: assign target_class for the foreground and Background_class for background
-                final_mask = np.where(refined_mask, target_class, Background_class).astype(np.uint8)
+
+                final_mask = np.squeeze(final_mask)
+                modified_mask = np.where(final_mask, target_class, Background_class).astype(np.uint8)
                 mask_save_path = os.path.join(save_folder, f'mask_{os.path.splitext(os.path.basename(image_path))[0]}.png')
-                cv2.imwrite(mask_save_path, final_mask)
-                logger.info(f"Refined mask saved to {mask_save_path}")
+                cv2.imwrite(mask_save_path, modified_mask)
+                logger.info(f"Combined mask modified and saved to {mask_save_path}")
             else:
-                logger.info(f"No activation contours found for {image_path}; skipping mask generation.")
+                logger.info(f"No contours found for {image_path}, skipping mask generation.")
     except Exception as e:
         logger.error(f"Error processing images in batch: {e}")
     finally:
         torch.cuda.empty_cache()
-
-
 
 def process_folder(subdir, folder_idx, Threshold_value, No_of_sampled_points):
     initialize_model()
