@@ -19,13 +19,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Setup base directory and parameters
-base_dir = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/data_copy/'
+base_dir = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/data/'
 
 
-Threshold_value = 150
+Threshold_value = 80#150
 No_of_sampled_points = 2
 No_classes = 6
-Batch_size = 8  # Adjust batch size based on your GPU capacity
+Batch_size = 16  # Adjust batch size based on your GPU capacity
 Background_class = 10
 
 # Load models and preprocessing

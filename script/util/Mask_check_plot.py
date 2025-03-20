@@ -5,14 +5,15 @@ import matplotlib.colors as mcolors
 import numpy as np
 import random
 import shutil
-# Define colormap for masks
-num_classes = 13  # Number of classes in the dataset
-cmap_values = np.linspace(0, 1, num_classes)  # For generating distinct values
-colors = plt.cm.tab20(cmap_values)  # Using tab20 colormap for more options
-cmap = mcolors.ListedColormap(colors)
+
+# Define background value and two colors for the binary mask
+BACKGROUND_VALUE = 10  # Change this if your background value is different
+bg_color = '#BBBD22'
+fg_color = '#16417C'
+cmap = mcolors.ListedColormap([bg_color, fg_color])
 
 # Path to the folder containing images and masks
-data_folder = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/data_copy'
+data_folder = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/data'
 
 # Get list of class folders
 class_folders = os.listdir(data_folder)
@@ -21,7 +22,7 @@ class_folders = os.listdir(data_folder)
 mask_classes = [c for c in class_folders if "_mask" in c]
 
 # Define the number of examples to plot for each class
-num_examples = 8
+num_examples = 4
 
 # Define the maximum number of subplots
 max_subplots = 160
@@ -70,6 +71,9 @@ for i, mask_class in enumerate(sorted(mask_classes)):
             print(f"Error loading image or mask: {image_path} / {mask_path}")
             continue
 
+        # Convert mask to binary: 0 for background, 1 for foreground
+        mask_binary = np.where(mask == BACKGROUND_VALUE, 0, 1)
+
         # Adjust the subplot indices to account for the first column being used for class names
         image_subplot_index = i * num_cols_adjusted + 2 * j + 2  # Shift to the right to accommodate the class name
         mask_subplot_index = i * num_cols_adjusted + 2 * j + 3
@@ -79,13 +83,13 @@ for i, mask_class in enumerate(sorted(mask_classes)):
         plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         plt.axis('off')
 
-        # Plot mask
+        # Plot binary mask using the two-color colormap
         plt.subplot(num_rows, num_cols_adjusted, mask_subplot_index)
-        plt.imshow(mask, cmap=cmap, vmin=0, vmax=num_classes)
+        plt.imshow(mask_binary, cmap=cmap, vmin=0, vmax=1)
         plt.axis('off')
 
 # Path to save the plot
-save_path = data_folder+"plot_image_masks.png"
+save_path = os.path.join(data_folder, "plot_image_masks.png")
 
 # Ensure the directory exists
 os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -93,5 +97,3 @@ os.makedirs(os.path.dirname(save_path), exist_ok=True)
 # Save the plot as an image file
 plt.savefig(save_path)
 plt.show()
-
-
