@@ -21,9 +21,9 @@ data_path = "/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segm
 num_img_per_class = 4000
 batch_size = 16
 num_epochs = 150
-num_classes = 6
+num_classes = 31
 image_size = 512  # Manually set image size
-GPU_index = 'cuda:2'
+GPU_index = 'cuda:0'
 
 # Initialize logger
 logging.basicConfig(
@@ -68,7 +68,8 @@ def get_data_loaders(data_dir, batch_size, num_img_per_class, image_size):
     # Shuffle and split indices for training and validation
     train_size = int(0.8 * len(dataset))
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, len(dataset)-train_size])
-
+    
+    #PUT THIS PART BEFORE INFLATING THE TRAINING DATA
     train_sampler = SubsetRandomSampler(train_indices)
     val_sampler = SubsetRandomSampler(val_indices)
 
