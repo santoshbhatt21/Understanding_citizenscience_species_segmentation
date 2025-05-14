@@ -8,20 +8,31 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Define species list with only scientific names
 species_list = [
-    "Buddleja davidii",
-    "Rhus typhina",
-    "Reynoutria japonica",
-    "Bunias orientalis",
-    "Senecio inaequidens",
-    "Ailanthus altissima"
+    "Abies alba",
+    "Acer campestre",
+    "Acer pseudoplatanus",
+    "Acer saccharum",
+    "Betula pendula",
+    "Fagus sylvatica",
+    "Fraxinus excelsior",
+    "Picea abies",
+    "Picea glauca",
+    "Pinus radiata",
+    "Pinus sylvestris",
+    "Populus deltoides",
+    "Populus tremuloides",
+    "Pseudotsuga menziesii",
+    "Quercus robur",
+    "Quercus rubra",
+    "Tilia cordata"
 ]
 
 # Set up directories and parameters
-output_dir = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/data'
+output_dir = 'E:\Santosh_master_thesis\iNaturalist'
 os.makedirs(output_dir, exist_ok=True)
 
 images_per_species = 100  # Total images per species to download
-num_cpus = min(os.cpu_count(), 1)  # Use up to 2 CPUs
+num_cpus = min(os.cpu_count(), 1)  # Use up to CPUs
 rate_limit_delay = 1  # Delay in seconds between API requests to avoid rate limits
 
 # If running on Linux/macOS, lock the script to the specified CPUs
