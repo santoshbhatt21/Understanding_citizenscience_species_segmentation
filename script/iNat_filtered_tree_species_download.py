@@ -20,8 +20,8 @@ species_list = [
 output_dir = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/data'
 os.makedirs(output_dir, exist_ok=True)
 
-images_per_species = 10000  # Total images per species to download
-num_cpus = min(os.cpu_count(), 2)  # Use up to 2 CPUs
+images_per_species = 100  # Total images per species to download
+num_cpus = min(os.cpu_count(), 1)  # Use up to 2 CPUs
 rate_limit_delay = 1  # Delay in seconds between API requests to avoid rate limits
 
 # If running on Linux/macOS, lock the script to the specified CPUs
@@ -60,7 +60,7 @@ def download_species_images(idx, species_name, total_species):
     print(f"\n📌 Processing species {idx}/{total_species}: {species_name} (Taxon ID: {species_id})")
 
     images_to_download = images_per_species  # Target number of images
-    per_page = 200  # Maximum observations per API call (if supported)
+    per_page = 20  # Maximum observations per API call (if supported)
     page = 1
     image_count = 0
     metadata_list = []
@@ -73,7 +73,7 @@ def download_species_images(idx, species_name, total_species):
                     term_value_id=38,          # Green Leaves
                     quality_grade='research',
                     has=['photo'],
-                    month="5,6,7,8,9",         # Only observations from May through September
+                    month="1,2,5,6,7,8,9,11,12",         # Observations from January-February, May through September, and November-December
                     per_page=per_page,
                     page=page
                 )
