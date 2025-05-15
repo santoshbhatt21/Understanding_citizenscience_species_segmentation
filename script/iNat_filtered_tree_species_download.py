@@ -13,6 +13,8 @@ species_list = [
     "Acer pseudoplatanus",
     "Acer saccharum",
     "Betula pendula",
+    "Carpinus betulus",
+    "Castanea sativa",
     "Fagus sylvatica",
     "Fraxinus excelsior",
     "Picea abies",
