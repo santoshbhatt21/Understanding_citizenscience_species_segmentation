@@ -10,30 +10,56 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 species_list = [
     "Abies alba",
     "Acer campestre",
+    "Acer platanoides",
     "Acer pseudoplatanus",
     "Acer saccharum",
+    "Alnus glutinosa",
+    "Alnus incana",
     "Betula pendula",
+    "Betula pubescens",
     "Carpinus betulus",
     "Castanea sativa",
+    "Corylus avellana",
     "Fagus sylvatica",
     "Fraxinus excelsior",
+    "Ilex aquifolium",
+    "Juglans regia",
+    "Juglans nigra",
+    "Juniperus communis",
+    "Larix decidua",
+    "Liriodendron tulipifera",
     "Picea abies",
     "Picea glauca",
     "Pinus radiata",
     "Pinus sylvestris",
+    "Populus alba",
+    "Populus avium",
+    "Populus nigra",
+    "Populus tremula",
     "Populus deltoides",
     "Populus tremuloides",
     "Pseudotsuga menziesii",
+    "Quercus petraea",
     "Quercus robur",
     "Quercus rubra",
-    "Tilia cordata"
+    "Robinia pseudoacacia",
+    "Salix alba",
+    "Salix caprea",
+    "Salix babylonica",
+    "Sorbus aucuparia",
+    "Sorbus torminalis",
+    "Taxus baccata",
+    "Tilia platyphyllos",
+    "Tilia cordata",
+    "Ulmus glabra",
+    "Ulmus laevis",
 ]
 
 # Set up directories and parameters
-output_dir = 'E:\Santosh_master_thesis\iNaturalist'
+output_dir = "C:/Users/santo/OneDrive - University of Eastern Finland/A Master Thesis/Images"
 os.makedirs(output_dir, exist_ok=True)
 
-images_per_species = 100  # Total images per species to download
+images_per_species = 10  # Total images per species to download
 num_cpus = min(os.cpu_count(), 1)  # Use up to CPUs
 rate_limit_delay = 1  # Delay in seconds between API requests to avoid rate limits
 
@@ -73,7 +99,7 @@ def download_species_images(idx, species_name, total_species):
     print(f"\n📌 Processing species {idx}/{total_species}: {species_name} (Taxon ID: {species_id})")
 
     images_to_download = images_per_species  # Target number of images
-    per_page = 20  # Maximum observations per API call (if supported)
+    per_page = 5  # Maximum observations per API call (if supported)
     page = 1
     image_count = 0
     metadata_list = []
