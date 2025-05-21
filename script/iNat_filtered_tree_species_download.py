@@ -9,57 +9,17 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Define species list with only scientific names
 species_list = [
     "Abies alba",
-    "Acer campestre",
-    "Acer platanoides",
-    "Acer pseudoplatanus",
-    "Acer saccharum",
-    "Alnus glutinosa",
-    "Alnus incana",
-    "Betula pendula",
-    "Betula pubescens",
-    "Carpinus betulus",
-    "Castanea sativa",
-    "Corylus avellana",
-    "Fagus sylvatica",
-    "Fraxinus excelsior",
-    "Ilex aquifolium",
-    "Juglans regia",
-    "Juglans nigra",
-    "Juniperus communis",
     "Larix decidua",
-    "Liriodendron tulipifera",
     "Picea abies",
-    "Picea glauca",
-    "Pinus radiata",
     "Pinus sylvestris",
-    "Populus alba",
-    "Populus nigra",
-    "Populus tremula",
-    "Populus deltoides",
-    "Populus tremuloides",
-    "Prunus avium",
     "Pseudotsuga menziesii",
-    "Quercus petraea",
-    "Quercus robur",
-    "Quercus rubra",
-    "Robinia pseudoacacia",
-    "Salix alba",
-    "Salix caprea",
-    "Salix babylonica",
-    "Sorbus aucuparia",
-    "Sorbus torminalis",
-    "Taxus baccata",
-    "Tilia platyphyllos",
-    "Tilia cordata",
-    "Ulmus glabra",
-    "Ulmus laevis",
 ]
 
 # Set up directories and parameters
 output_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
 os.makedirs(output_dir, exist_ok=True)
 
-images_per_species = 100  # Total images per species to download
+images_per_species = 2000  # Total images per species to download
 num_cpus = min(os.cpu_count(), 2)  # Use up to CPUs
 rate_limit_delay = 1  # Delay in seconds between API requests to avoid rate limits
 
