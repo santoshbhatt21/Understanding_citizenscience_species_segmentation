@@ -1,4 +1,4 @@
-# Plant species Segmentation in citizen science imagery
+# Tree species Segmentation in citizen science imagery
 
 This repository contains code for generating masks for citizen science plant photographs.
 I am using this repo to understand the process for the same. 
