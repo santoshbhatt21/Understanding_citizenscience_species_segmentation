@@ -72,7 +72,7 @@ def download_species_images(idx, species_name, total_species):
             try:
                 observations = get_observations(
                     taxon_id=species_id,
-                    term_value_id=38,          # Green Leaves
+                    without_term_value_id=19,  # Excluding Dead
                     quality_grade='research',
                     has=['photo'],
                     # Observations from January-February, May through September, and November-December

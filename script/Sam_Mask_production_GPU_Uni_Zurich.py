@@ -19,17 +19,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Setup base directory and parameters
-base_dir = 'E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data'
+base_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
 
-Threshold_value = 80  # 150
+Threshold_value = 150  # Medium focused with details
 No_of_sampled_points = 2
-No_classes = 6
+No_classes = 5  # Number of classes in the dataset, species (folder)
 Batch_size = 16  # Adjust batch size based on your GPU capacity
 Background_class = 10
 
 # Load models and preprocessing
-model_path = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/Checkpoint/best_model_68_0.02.pth'
-sam_checkpoint = '/mnt/gsdata/projects/bigplantsens/1_FloraMask/4_F_Japonica/checkpoint/F_japonica_cam/sam_vit_h_4b8939.pth'
+model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check Point"
+sam_checkpoint = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/FloraMask"
 
 patterns = tuple(['.jpg', '.png', '.JPEG', '.JPG', '.PNG', '.jpeg'])
 
@@ -48,7 +48,7 @@ def initialize_model():
         new_state_dict[name] = v
     model.load_state_dict(new_state_dict, strict=False)
 
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
     model.eval()
 
