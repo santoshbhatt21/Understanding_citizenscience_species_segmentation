@@ -33,11 +33,11 @@ species_list = [
     "Pinus radiata",
     "Pinus sylvestris",
     "Populus alba",
-    "Populus avium",
     "Populus nigra",
     "Populus tremula",
     "Populus deltoides",
     "Populus tremuloides",
+    "Prunus avium",
     "Pseudotsuga menziesii",
     "Quercus petraea",
     "Quercus robur",
@@ -56,16 +56,17 @@ species_list = [
 ]
 
 # Set up directories and parameters
-output_dir = "C:/Users/santo/OneDrive - University of Eastern Finland/A Master Thesis/Images"
+output_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
 os.makedirs(output_dir, exist_ok=True)
 
-images_per_species = 10  # Total images per species to download
-num_cpus = min(os.cpu_count(), 1)  # Use up to CPUs
+images_per_species = 100  # Total images per species to download
+num_cpus = min(os.cpu_count(), 2)  # Use up to CPUs
 rate_limit_delay = 1  # Delay in seconds between API requests to avoid rate limits
 
 # If running on Linux/macOS, lock the script to the specified CPUs
 if hasattr(os, 'sched_setaffinity'):
     os.sched_setaffinity(0, list(range(num_cpus)))
+
 
 def get_taxon_id_for_species(species_name):
     """
@@ -82,6 +83,7 @@ def get_taxon_id_for_species(species_name):
         print(f"❌ Error fetching taxon for {species_name}: {e}")
         return None
 
+
 def download_species_images(idx, species_name, total_species):
     """
     Download images for the given species and save them in a folder named after the species.
@@ -96,10 +98,11 @@ def download_species_images(idx, species_name, total_species):
         print(f"❌ No taxon found for species: {species_name}")
         return
 
-    print(f"\n📌 Processing species {idx}/{total_species}: {species_name} (Taxon ID: {species_id})")
+    print(
+        f"\n📌 Processing species {idx}/{total_species}: {species_name} (Taxon ID: {species_id})")
 
     images_to_download = images_per_species  # Target number of images
-    per_page = 5  # Maximum observations per API call (if supported)
+    per_page = 20  # Maximum observations per API call (if supported)
     page = 1
     image_count = 0
     metadata_list = []
@@ -112,17 +115,20 @@ def download_species_images(idx, species_name, total_species):
                     term_value_id=38,          # Green Leaves
                     quality_grade='research',
                     has=['photo'],
-                    month="1,2,5,6,7,8,9,11,12",         # Observations from January-February, May through September, and November-December
+                    # Observations from January-February, May through September, and November-December
+                    month="1,2,5,6,7,8,9,11,12",
                     per_page=per_page,
                     page=page
                 )
                 time.sleep(rate_limit_delay)
             except requests.exceptions.RequestException as e:
-                print(f"⚠️ Error fetching observations for {species_name} on page {page}: {e}")
+                print(
+                    f"⚠️ Error fetching observations for {species_name} on page {page}: {e}")
                 break
 
             if not observations['results']:
-                print(f"⚠️ No more observations found for {species_name} on page {page}.")
+                print(
+                    f"⚠️ No more observations found for {species_name} on page {page}.")
                 break
 
             for obs in observations['results']:
@@ -147,10 +153,12 @@ def download_species_images(idx, species_name, total_species):
                             meta['local_path'] = relative_path
                             metadata_list.append(meta)
                 except requests.exceptions.RequestException as e:
-                    print(f"❌ Failed to download image for observation {obs.get('id', 'unknown')}: {e}")
+                    print(
+                        f"❌ Failed to download image for observation {obs.get('id', 'unknown')}: {e}")
             page += 1
 
-    print(f"✅ Finished downloading {image_count} images for species: {species_name}")
+    print(
+        f"✅ Finished downloading {image_count} images for species: {species_name}")
 
     if metadata_list:
         try:
@@ -159,7 +167,9 @@ def download_species_images(idx, species_name, total_species):
             df.to_csv(csv_file, index=False)
             print(f"✅ Metadata CSV saved for species: {species_name}")
         except Exception as e:
-            print(f"❌ Failed to save metadata CSV for species {species_name}: {e}")
+            print(
+                f"❌ Failed to save metadata CSV for species {species_name}: {e}")
+
 
 # Process each species in parallel using ThreadPoolExecutor
 with ThreadPoolExecutor(max_workers=num_cpus) as executor:

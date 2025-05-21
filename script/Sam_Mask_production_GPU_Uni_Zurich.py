@@ -1,5 +1,5 @@
 
-##Add the functionality to your code that can read files recursively 
+# Add the functionality to your code that can read files recursively
 import os
 import torch
 import cv2
@@ -19,10 +19,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Setup base directory and parameters
-base_dir = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/data/'
+base_dir = 'E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data'
 
-
-Threshold_value = 80#150
+Threshold_value = 80  # 150
 No_of_sampled_points = 2
 No_classes = 6
 Batch_size = 16  # Adjust batch size based on your GPU capacity
@@ -60,8 +59,10 @@ def initialize_model():
     transform = transforms.Compose([
         transforms.Resize((512, 512)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
+                             0.229, 0.224, 0.225]),
     ])
+
 
 def sample_points_within_contour(contour, num_points):
     rect = cv2.boundingRect(contour)
@@ -98,16 +99,20 @@ def process_images_in_batch(image_paths, target_class, threshold_value, num_samp
         for idx, (image_path, original_image) in enumerate(original_images):
             # Resize activation map to original image size and threshold it
             grayscale_cam = grayscale_cams[idx]
-            grayscale_cam_resized = cv2.resize(grayscale_cam, original_image.size, interpolation=cv2.INTER_LINEAR)
-            _, binary_map = cv2.threshold(np.uint8(255 * grayscale_cam_resized), threshold_value, 255, cv2.THRESH_BINARY)
-            
+            grayscale_cam_resized = cv2.resize(
+                grayscale_cam, original_image.size, interpolation=cv2.INTER_LINEAR)
+            _, binary_map = cv2.threshold(
+                np.uint8(255 * grayscale_cam_resized), threshold_value, 255, cv2.THRESH_BINARY)
+
             # Find contours on the binary map to extract candidate regions
-            contours, _ = cv2.findContours(binary_map, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            
+            contours, _ = cv2.findContours(
+                binary_map, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
             # Sample points from the activated regions (using your helper function)
             all_sampled_points, all_input_labels = [], []
             for contour in contours:
-                sampled_points = sample_points_within_contour(contour, num_sampled_points)
+                sampled_points = sample_points_within_contour(
+                    contour, num_sampled_points)
                 all_sampled_points.extend(sampled_points)
                 all_input_labels.extend([1] * len(sampled_points))
 
@@ -119,12 +124,12 @@ def process_images_in_batch(image_paths, target_class, threshold_value, num_samp
                     point_labels=np.array(all_input_labels, dtype=np.int32),
                     multimask_output=True  # Generate several candidate masks
                 )
-                
+
                 # STEP 3: Score-Based Selection & Refinement
                 # Select the mask with the highest score as the candidate for refinement
                 best_mask_index = np.argmax(scores)
                 best_mask_input = logits[best_mask_index, :, :]
-                
+
                 # Refine the mask by feeding it back into SAM using the best mask as an input
                 refined_mask, _, _ = predictor.predict(
                     point_coords=np.array(all_sampled_points),
@@ -133,19 +138,21 @@ def process_images_in_batch(image_paths, target_class, threshold_value, num_samp
                     multimask_output=False  # Only one refined output is needed
                 )
                 refined_mask = np.squeeze(refined_mask)
-                
+
                 # Create final mask: assign target_class for the foreground and Background_class for background
-                final_mask = np.where(refined_mask, target_class, Background_class).astype(np.uint8)
-                mask_save_path = os.path.join(save_folder, f'mask_{os.path.splitext(os.path.basename(image_path))[0]}.png')
+                final_mask = np.where(
+                    refined_mask, target_class, Background_class).astype(np.uint8)
+                mask_save_path = os.path.join(
+                    save_folder, f'mask_{os.path.splitext(os.path.basename(image_path))[0]}.png')
                 cv2.imwrite(mask_save_path, final_mask)
                 logger.info(f"Refined mask saved to {mask_save_path}")
             else:
-                logger.info(f"No activation contours found for {image_path}; skipping mask generation.")
+                logger.info(
+                    f"No activation contours found for {image_path}; skipping mask generation.")
     except Exception as e:
         logger.error(f"Error processing images in batch: {e}")
     finally:
         torch.cuda.empty_cache()
-
 
 
 def process_folder(subdir, folder_idx, Threshold_value, No_of_sampled_points):
@@ -155,17 +162,21 @@ def process_folder(subdir, folder_idx, Threshold_value, No_of_sampled_points):
     if os.path.isdir(subdir_path):
         save_folder = os.path.join(root, f'{subdir}_mask')
         os.makedirs(save_folder, exist_ok=True)
-        image_paths = [os.path.join(subdir_path, image_name) for image_name in os.listdir(subdir_path) if os.path.isfile(os.path.join(subdir_path, image_name)) and image_name.lower().endswith(patterns)]
+        image_paths = [os.path.join(subdir_path, image_name) for image_name in os.listdir(subdir_path) if os.path.isfile(
+            os.path.join(subdir_path, image_name)) and image_name.lower().endswith(patterns)]
 
         for i in range(0, len(image_paths), Batch_size):
             batch_paths = image_paths[i:i + Batch_size]
-            process_images_in_batch(batch_paths, target_class, Threshold_value, No_of_sampled_points, save_folder)
+            process_images_in_batch(
+                batch_paths, target_class, Threshold_value, No_of_sampled_points, save_folder)
+
 
 if __name__ == "__main__":
     try:
         for root, dirs, files in os.walk(base_dir):
             for folder_idx, subdir in enumerate(sorted(dirs)):
-                process_folder(subdir, folder_idx, Threshold_value, No_of_sampled_points)
+                process_folder(subdir, folder_idx,
+                               Threshold_value, No_of_sampled_points)
 
     except Exception as e:
         logger.error(f"Error in main process: {e}")
