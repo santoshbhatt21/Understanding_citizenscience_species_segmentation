@@ -16,15 +16,16 @@ from torchvision.datasets import ImageFolder
 from torchmetrics import Accuracy, MeanMetric
 
 # Paths and constants
-checkpoint_path = "/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/Checkpoint"
-data_path = "/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/data/"
-num_img_per_class = 4000
+checkpoint_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check Point"
+data_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
+num_img_per_class = 2000  # Number of images per class
 batch_size = 16
 num_epochs = 150
-num_classes = 31
+num_classes = 5
 image_size = 512  # Manually set image size
-GPU_index = 'cuda:0'
+GPU_index = 'cuda:0'  # Only one GPU is used
 
+# os.mkdir(checkpoint_path, exist_ok=True)
 # Initialize logger
 logging.basicConfig(
     level=logging.INFO,
@@ -45,7 +46,7 @@ transform = transforms.Compose([
 ])
 
 device = torch.device(GPU_index if torch.cuda.is_available() else 'cpu')
-torch.cuda.set_device(device)  # Remove the helper function entirely
+# torch.cuda.set_device(device)  # Remove the helper function entirely
 
 
 def get_data_loaders(data_dir, batch_size, num_img_per_class, image_size):
