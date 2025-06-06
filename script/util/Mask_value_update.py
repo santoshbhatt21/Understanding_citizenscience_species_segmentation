@@ -34,10 +34,10 @@ def process_masks_in_folder(folder_path, num_cpus):
         list(tqdm(pool.imap_unordered(process_mask, mask_files), total=len(mask_files), desc="Processing masks", unit="file"))
 
 # Path to the main folder containing the three folders with masks
-main_folder_path = '/mnt/gsdata/projects/bigplantsens/5_ETH_Zurich_Citizen_Science_Segment/data/'
+main_folder_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
 
 # Number of CPUs to use
-num_cpus = 50 # You can adjust this to the desired number of CPUs
+num_cpus = 10 # You can adjust this to the desired number of CPUs
 
 # Process each folder
 process_masks_in_folder(main_folder_path, num_cpus)

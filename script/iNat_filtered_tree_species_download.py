@@ -20,7 +20,7 @@ output_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segm
 os.makedirs(output_dir, exist_ok=True)
 
 images_per_species = 2000  # Total images per species to download
-num_cpus = min(os.cpu_count(), 2)  # Use up to CPUs
+num_cpus = min(os.cpu_count(), 20)  # Use up to CPUs
 rate_limit_delay = 1  # Delay in seconds between API requests to avoid rate limits
 
 # If running on Linux/macOS, lock the script to the specified CPUs

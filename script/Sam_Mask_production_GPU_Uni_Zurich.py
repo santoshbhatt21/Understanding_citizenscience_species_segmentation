@@ -29,7 +29,7 @@ Background_class = 10
 
 # Load models and preprocessing
 model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check Point"
-sam_checkpoint = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/FloraMask"
+sam_checkpoint = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/SAM2/sam_vit_h_4b8939.pth"
 
 patterns = tuple(['.jpg', '.png', '.JPEG', '.JPG', '.PNG', '.jpeg'])
 
