@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 base_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
 
 Threshold_value = 150  # Medium focused with details
-No_of_sampled_points = 2
-No_classes = 5  # Number of classes in the dataset, species (folder)
-Batch_size = 8  # Adjust batch size based on your GPU capacity
+No_of_sampled_points = 3
+No_classes = 7  # Number of classes in the dataset, species (folder)
+Batch_size = 10  # Adjust batch size based on your GPU capacity
 Background_class = 10
 
 # Load models and preprocessing
-model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check Point"
+model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point"
 sam_checkpoint = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/SAM2/sam_vit_h_4b8939.pth"
 
 patterns = tuple(['.jpg', '.png', '.JPEG', '.JPG', '.PNG', '.jpeg'])

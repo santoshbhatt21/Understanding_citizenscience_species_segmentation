@@ -19,13 +19,13 @@ from torchmetrics import Accuracy, MeanMetric
 checkpoint_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point"
 data_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
 num_img_per_class = 2000  # Number of images per class
-batch_size = 8
-num_epochs = 20
-num_classes = 5
+batch_size = 10  # Batch size for training
+num_epochs = 50  # Number of epochs for training
+num_classes = 7  # Number of classes in the dataset
 image_size = 512  # Manually set image size
 GPU_index = 'cuda:0'  # Only one GPU is used
 
-os.mkdir(checkpoint_path, exist_ok=True)
+os.makedirs(checkpoint_path, exist_ok=True)
 # Initialize logger
 logging.basicConfig(
     level=logging.INFO,

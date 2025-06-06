@@ -8,11 +8,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Define species list with only scientific names
 species_list = [
-    "Abies alba",
-    "Larix decidua",
-    "Picea abies",
-    "Pinus sylvestris",
-    "Pseudotsuga menziesii",
+    # "Abies alba",
+    # "Larix decidua",
+    # "Picea abies",
+    # "Pinus sylvestris",
+    # "Pseudotsuga menziesii",
+    "Fagus sylvatica",
+    "Quercus rubra",
+    "Fraxinus excelsior",
+    "Acer pseudoplatanus",
+    "Betula pendula",
 ]
 
 # Set up directories and parameters
@@ -20,7 +25,7 @@ output_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segm
 os.makedirs(output_dir, exist_ok=True)
 
 images_per_species = 2000  # Total images per species to download
-num_cpus = min(os.cpu_count(), 20)  # Use up to CPUs
+num_cpus = min(os.cpu_count(), 30)  # Use up to CPUs
 rate_limit_delay = 1  # Delay in seconds between API requests to avoid rate limits
 
 # If running on Linux/macOS, lock the script to the specified CPUs
@@ -47,7 +52,7 @@ def get_taxon_id_for_species(species_name):
 def download_species_images(idx, species_name, total_species):
     """
     Download images for the given species and save them in a folder named after the species.
-    Uses pagination to download up to 10,000 images during the growing season (May–September).
+    Uses pagination to download up to 2000 images during the growing season (May–September).
     """
     species_name_sanitized = species_name.replace(" ", "_")
     species_dir = os.path.join(output_dir, species_name_sanitized)
