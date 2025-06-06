@@ -187,3 +187,6 @@ metadata.csv
 
 # exclude xml files
 *.xml
+
+# exclude untracked files
+*.untracked
