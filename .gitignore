@@ -178,3 +178,10 @@ cython_debug/
 
 # exclude csv metadata files
 metadata.csv
+
+# exlude path files
+*.pth
+
+
+# exclude xml files
+*.xml

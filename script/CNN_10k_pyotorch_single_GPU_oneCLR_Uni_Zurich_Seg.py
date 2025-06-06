@@ -16,16 +16,16 @@ from torchvision.datasets import ImageFolder
 from torchmetrics import Accuracy, MeanMetric
 
 # Paths and constants
-checkpoint_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check Point"
+checkpoint_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point"
 data_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
 num_img_per_class = 2000  # Number of images per class
-batch_size = 16
+batch_size = 8
 num_epochs = 150
 num_classes = 5
 image_size = 512  # Manually set image size
 GPU_index = 'cuda:0'  # Only one GPU is used
 
-# os.mkdir(checkpoint_path, exist_ok=True)
+os.mkdir(checkpoint_path, exist_ok=True)
 # Initialize logger
 logging.basicConfig(
     level=logging.INFO,
