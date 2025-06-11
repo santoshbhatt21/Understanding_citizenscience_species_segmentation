@@ -1,0 +1,25 @@
+from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
+import matplotlib.pyplot as plt
+
+log_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point"
+event_acc = EventAccumulator(log_dir)
+event_acc.Reload()
+
+# Use exact tags used in writer.add_scalar
+train_loss = event_acc.Scalars('Training Loss')
+val_loss = event_acc.Scalars('Validation Loss')
+
+train_vals = [x.value for x in train_loss]
+val_vals = [x.value for x in val_loss]
+epochs = list(range(len(train_vals)))
+
+plt.plot(epochs, train_vals, label="Training Loss")
+plt.plot(epochs, val_vals, label="Validation Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.title("Training and Validation Loss from TensorBoard Logs")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.savefig("reconstructed_loss_plot.png")
+plt.show()

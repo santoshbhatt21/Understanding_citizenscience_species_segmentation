@@ -8,6 +8,7 @@ import numpy as np
 from tqdm import tqdm
 import logging
 import copy
+import matplotlib.pyplot as plt
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.tensorboard import SummaryWriter
 from PIL import Image
@@ -15,13 +16,14 @@ from torch.utils.data import Dataset
 from torchvision.datasets import ImageFolder
 from torchmetrics import Accuracy, MeanMetric
 
+
 # Paths and constants
 checkpoint_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point"
 data_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
 num_img_per_class = 2000  # Number of images per class
 batch_size = 10  # Batch size for training
 num_epochs = 50  # Number of epochs for training
-num_classes = 7  # Number of classes in the dataset
+num_classes = 10  # Number of classes in the dataset
 image_size = 512  # Manually set image size
 GPU_index = 'cuda:0'  # Only one GPU is used
 
@@ -98,7 +100,8 @@ def get_data_loaders(data_dir, batch_size, num_img_per_class, image_size):
 def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader, num_epochs, device, writer, checkpoint_path, logger):
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = float('inf')
-
+    train_losses = []
+    val_losses = []
     for epoch in range(num_epochs):
         logger.info(f'Epoch {epoch}/{num_epochs - 1}')
         logger.info('-' * 10)
@@ -128,17 +131,30 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
             running_loss += loss.item() * inputs.size(0)
             running_corrects += torch.sum(preds == labels.data).item()
 
+            writer.add_scalar('Training Loss', loss.item(),
+                              epoch * len(train_loader) + batch_idx)
+            writer.add_scalar('Learning Rate', scheduler.get_last_lr()[
+                              0], epoch * len(train_loader) + batch_idx)
+
+            #epoch_loss = running_loss / len(train_loader.dataset)
+            #epoch_acc = running_corrects / len(train_loader.dataset)
+
+            #train_losses.append(epoch_loss)  # <--- Store training loss
+
+            #writer.add_scalar('Training Loss', epoch_loss, epoch)
+            #writer.add_scalar('Training Accuracy', epoch_acc, epoch)
+
             # Calculate batch accuracy and error rate
-            batch_loss = loss.item()
-            batch_acc = torch.sum(preds == labels.data).item() / inputs.size(0)
+            #batch_loss = loss.item()
+            #batch_acc = torch.sum(preds == labels.data).item() / inputs.size(0)
 
             # Update tqdm description with metrics
-            progress_bar.set_postfix({
-                'Loss': f'{batch_loss:.4f}',
-                'Acc': f'{batch_acc:.4f}'
-            })
+            #progress_bar.set_postfix({
+            #    'Loss': f'{batch_loss:.4f}',
+            #   'Acc': f'{batch_acc:.4f}'
+            #})
 
-            writer.add_scalar('Training Loss', batch_loss,
+            writer.add_scalar('Training Loss', loss.item(),
                               epoch * len(train_loader) + batch_idx)
             writer.add_scalar('Learning Rate', scheduler.get_last_lr()[
                               0], epoch * len(train_loader) + batch_idx)
@@ -146,10 +162,10 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
         epoch_loss = running_loss / len(train_loader.dataset)
         epoch_acc = running_corrects / len(train_loader.dataset)
 
-        writer.add_scalar('Epoch Training Loss', epoch_loss, epoch)
-        writer.add_scalar('Epoch Training Accuracy', epoch_acc, epoch)
+        writer.add_scalar('Training Loss', epoch_loss, epoch)
+        writer.add_scalar('Training Accuracy', epoch_acc, epoch)
 
-        logger.info(f'Train Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+        logger.info(f'Training Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
         print(
             f'Epoch {epoch}/{num_epochs - 1} - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.4f}')
 
@@ -173,6 +189,8 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
         val_loss = val_loss / len(val_loader.dataset)
         val_acc = val_corrects / len(val_loader.dataset)
 
+        val_losses.append(val_loss)  # <--- Store validation loss
+
         writer.add_scalar('Validation Loss', val_loss, epoch)
         writer.add_scalar('Validation Accuracy', val_acc, epoch)
 
@@ -191,7 +209,28 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
             logger.info(
                 f"Saved best model checkpoint at epoch {epoch} with validation loss {best_loss:.2f}.")
 
+        # Save model for every epoch
+        all_epoch_dir = os.path.join(checkpoint_path, "All_Epoch_Models")
+        os.makedirs(all_epoch_dir, exist_ok=True)
+        model_filename = f"model_epoch_{epoch}_train_{epoch_loss:.4f}_val_{val_loss:.4f}.pth"
+        torch.save(model.state_dict(), os.path.join(
+            all_epoch_dir, model_filename))
+
     model.load_state_dict(best_model_wts)
+
+    # Plot losses
+    plt.figure(figsize=(10, 5))
+    plt.plot(range(num_epochs), train_losses, label='Training Loss')
+    plt.plot(range(num_epochs), val_losses, label='Validation Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training and Validation Loss per Epoch')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(checkpoint_path, "loss_curve.png"))  # Save plot
+    plt.show()
+
     return model
 
 
