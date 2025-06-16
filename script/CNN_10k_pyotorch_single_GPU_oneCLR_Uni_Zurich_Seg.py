@@ -16,7 +16,7 @@ from torch.utils.data import Dataset
 from torchvision.datasets import ImageFolder
 from torchmetrics import Accuracy, MeanMetric
 
-
+#torch.cuda.empty_cache()
 # Paths and constants
 checkpoint_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point"
 data_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
@@ -136,25 +136,25 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
             writer.add_scalar('Learning Rate', scheduler.get_last_lr()[
                               0], epoch * len(train_loader) + batch_idx)
 
-            #epoch_loss = running_loss / len(train_loader.dataset)
-            #epoch_acc = running_corrects / len(train_loader.dataset)
+            epoch_loss = running_loss / len(train_loader.dataset)
+            epoch_acc = running_corrects / len(train_loader.dataset)
 
-            #train_losses.append(epoch_loss)  # <--- Store training loss
+            train_losses.append(epoch_loss)  # <--- Store training loss
 
-            #writer.add_scalar('Training Loss', epoch_loss, epoch)
-            #writer.add_scalar('Training Accuracy', epoch_acc, epoch)
+            writer.add_scalar('Training Loss', epoch_loss, epoch)
+            writer.add_scalar('Training Accuracy', epoch_acc, epoch)
 
             # Calculate batch accuracy and error rate
-            #batch_loss = loss.item()
-            #batch_acc = torch.sum(preds == labels.data).item() / inputs.size(0)
+            batch_loss = loss.item()
+            batch_acc = torch.sum(preds == labels.data).item() / inputs.size(0)
 
-            # Update tqdm description with metrics
-            #progress_bar.set_postfix({
-            #    'Loss': f'{batch_loss:.4f}',
-            #   'Acc': f'{batch_acc:.4f}'
-            #})
+            #Update tqdm description with metrics
+            progress_bar.set_postfix({
+                'Loss': f'{batch_loss:.4f}',
+               'Acc': f'{batch_acc:.4f}'
+            })
 
-            writer.add_scalar('Training Loss', loss.item(),
+            writer.add_scalar('Training Loss', batch_loss,
                               epoch * len(train_loader) + batch_idx)
             writer.add_scalar('Learning Rate', scheduler.get_last_lr()[
                               0], epoch * len(train_loader) + batch_idx)
