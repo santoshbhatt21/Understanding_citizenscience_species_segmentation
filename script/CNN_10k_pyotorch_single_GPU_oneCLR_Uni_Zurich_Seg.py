@@ -48,7 +48,7 @@ transform = transforms.Compose([
 ])
 
 device = torch.device(GPU_index if torch.cuda.is_available() else 'cpu')
-# torch.cuda.set_device(device)  # Remove the helper function entirely
+torch.cuda.set_device(device)  # Remove the helper function entirely
 
 
 def get_data_loaders(data_dir, batch_size, num_img_per_class, image_size):
@@ -105,7 +105,7 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
     for epoch in range(num_epochs):
         logger.info(f'Epoch {epoch}/{num_epochs - 1}')
         logger.info('-' * 10)
-
+       
         # Training phase
         model.train()
         running_loss = 0.0
@@ -159,11 +159,11 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
             writer.add_scalar('Learning Rate', scheduler.get_last_lr()[
                               0], epoch * len(train_loader) + batch_idx)
 
-        epoch_loss = running_loss / len(train_loader.dataset)
-        epoch_acc = running_corrects / len(train_loader.dataset)
+        #epoch_loss = running_loss / len(train_loader.dataset)
+        #epoch_acc = running_corrects / len(train_loader.dataset)
 
-        writer.add_scalar('Training Loss', epoch_loss, epoch)
-        writer.add_scalar('Training Accuracy', epoch_acc, epoch)
+        #writer.add_scalar('Training Loss', epoch_loss, epoch)
+        #writer.add_scalar('Training Accuracy', epoch_acc, epoch)
 
         logger.info(f'Training Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
         print(

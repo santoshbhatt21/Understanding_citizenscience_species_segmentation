@@ -13,8 +13,8 @@ train_vals = [x.value for x in train_loss]
 val_vals = [x.value for x in val_loss]
 epochs = list(range(len(train_vals)))
 
-plt.plot(epochs, train_vals, label="Training Loss")
-plt.plot(epochs, val_vals, label="Validation Loss")
+plt.plot(range(len(train_loss)), train_loss, label="Training Loss")
+plt.plot(range(len(val_loss)), val_loss, label="Validation Loss")
 plt.xlabel("Epoch")
 plt.ylabel("Loss")
 plt.title("Training and Validation Loss from TensorBoard Logs")
@@ -23,3 +23,4 @@ plt.grid(True)
 plt.tight_layout()
 plt.savefig("reconstructed_loss_plot.png")
 plt.show()
+
