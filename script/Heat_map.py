@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 # Setup base directory and parameters
 base_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
-Threshold_value = 80
-No_of_sampled_points = 2
-No_classes = 7
+Threshold_value = 150
+No_of_sampled_points = 3
+No_classes = 10
 Batch_size = 10  # Adjust batch size based on your GPU capacity
 Background_class = 120 
 Contour_line_size = 2
@@ -31,14 +31,14 @@ point_color = (0, 0, 0)   # White points
 point_radius = 10
 
 # Load models and preprocessing
-model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point/best_model_39_0.21.pth"
+model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point/best_model_73_0.28.pth"
 patterns = tuple(['.jpg', '.png', '.JPEG', '.JPG', '.PNG', '.jpeg'])
 
 def initialize_model():
     global model, device, transform
 
     # Initialize the EfficientNet model
-    model = models.efficientnet_v2_l(weights=None)
+    model = models.efficientnet_v2_m(weights=None)
     num_ftrs = model.classifier[1].in_features
     model.classifier[1] = nn.Linear(num_ftrs, No_classes)
 
@@ -58,7 +58,7 @@ def initialize_model():
 
     # Define image transformations
     transform = transforms.Compose([
-        transforms.Resize((512, 512)),
+        transforms.Resize((256, 256)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])

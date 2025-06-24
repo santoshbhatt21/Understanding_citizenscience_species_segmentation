@@ -190,3 +190,6 @@ metadata.csv
 
 # exclude untracked files
 *.untracked
+
+# exclude run files
+runs/

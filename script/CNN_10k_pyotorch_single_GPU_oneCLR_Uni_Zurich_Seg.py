@@ -1,3 +1,4 @@
+import json
 import os
 import torch
 import torch.nn as nn
@@ -15,16 +16,18 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision.datasets import ImageFolder
 from torchmetrics import Accuracy, MeanMetric
+from datetime import datetime
 
+#os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 #torch.cuda.empty_cache()
 # Paths and constants
 checkpoint_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point"
 data_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
 num_img_per_class = 2000  # Number of images per class
 batch_size = 10  # Batch size for training
-num_epochs = 50  # Number of epochs for training
+num_epochs = 80  # Number of epochs for training, Adjust for the medium model
 num_classes = 10  # Number of classes in the dataset
-image_size = 512  # Manually set image size
+image_size = 256  # Manually set image size 256x256 or 512x512, for faster training
 GPU_index = 'cuda:0'  # Only one GPU is used
 
 os.makedirs(checkpoint_path, exist_ok=True)
@@ -83,9 +86,9 @@ def get_data_loaders(data_dir, batch_size, num_img_per_class, image_size):
     val_sampler = SubsetRandomSampler(val_indices)
 
     train_loader = DataLoader(
-        dataset, batch_size=batch_size, sampler=train_sampler, num_workers=4)
+        dataset, batch_size=batch_size, sampler=train_sampler, num_workers=8)
     val_loader = DataLoader(dataset, batch_size=batch_size,
-                            sampler=val_sampler, num_workers=4)
+                            sampler=val_sampler, num_workers=8)  # Use num_workers=8 for faster data loading
 
     # Print summary of number of sampled images per class
     sampled_class_counts = np.bincount(
@@ -100,8 +103,13 @@ def get_data_loaders(data_dir, batch_size, num_img_per_class, image_size):
 def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader, num_epochs, device, writer, checkpoint_path, logger):
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = float('inf')
-    train_losses = []
-    val_losses = []
+    train_losses, val_losses = [], []
+    train_accuracies, val_accuracies = [], []
+    
+    # === Create results dir ===
+    results_dir = os.path.join(checkpoint_path, "Training_Stats")
+    os.makedirs(results_dir, exist_ok=True)
+    
     for epoch in range(num_epochs):
         logger.info(f'Epoch {epoch}/{num_epochs - 1}')
         logger.info('-' * 10)
@@ -125,49 +133,32 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
                 _, preds = torch.max(outputs, 1)
                 loss.backward()
                 optimizer.step()
-
                 scheduler.step()
 
             running_loss += loss.item() * inputs.size(0)
             running_corrects += torch.sum(preds == labels.data).item()
 
-            writer.add_scalar('Training Loss', loss.item(),
-                              epoch * len(train_loader) + batch_idx)
-            writer.add_scalar('Learning Rate', scheduler.get_last_lr()[
-                              0], epoch * len(train_loader) + batch_idx)
+            batch_acc = torch.sum(preds == labels).item() / inputs.size(0)
+            progress_bar.set_postfix({'Loss': f'{loss.item():.4f}', 'Acc': f'{batch_acc:.4f}'})
 
-            epoch_loss = running_loss / len(train_loader.dataset)
-            epoch_acc = running_corrects / len(train_loader.dataset)
+        epoch_loss = running_loss / len(train_loader.dataset)
+        epoch_acc = running_corrects / len(train_loader.dataset)
+        train_losses.append(epoch_loss)
+        train_accuracies.append(epoch_acc)
 
-            train_losses.append(epoch_loss)  # <--- Store training loss
+        writer.add_scalar('Training Loss', epoch_loss, epoch)
+        writer.add_scalar('Training Accuracy', epoch_acc, epoch)
 
-            writer.add_scalar('Training Loss', epoch_loss, epoch)
-            writer.add_scalar('Training Accuracy', epoch_acc, epoch)
-
-            # Calculate batch accuracy and error rate
-            batch_loss = loss.item()
-            batch_acc = torch.sum(preds == labels.data).item() / inputs.size(0)
-
-            #Update tqdm description with metrics
-            progress_bar.set_postfix({
-                'Loss': f'{batch_loss:.4f}',
-               'Acc': f'{batch_acc:.4f}'
+        #logger.info(f'Training Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
+            
+        #Update tqdm description with metrics
+        progress_bar.set_postfix({
+        'Loss': f'{epoch_loss:.4f}',
+        'Acc': f'{epoch_acc:.4f}'
             })
 
-            writer.add_scalar('Training Loss', batch_loss,
-                              epoch * len(train_loader) + batch_idx)
-            writer.add_scalar('Learning Rate', scheduler.get_last_lr()[
-                              0], epoch * len(train_loader) + batch_idx)
-
-        #epoch_loss = running_loss / len(train_loader.dataset)
-        #epoch_acc = running_corrects / len(train_loader.dataset)
-
-        #writer.add_scalar('Training Loss', epoch_loss, epoch)
-        #writer.add_scalar('Training Accuracy', epoch_acc, epoch)
-
         logger.info(f'Training Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
-        print(
-            f'Epoch {epoch}/{num_epochs - 1} - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.4f}')
+        print(f'Epoch {epoch}/{num_epochs - 1} - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.4f}')
 
         # Validation phase
         model.eval()
@@ -189,7 +180,10 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
         val_loss = val_loss / len(val_loader.dataset)
         val_acc = val_corrects / len(val_loader.dataset)
 
-        val_losses.append(val_loss)  # <--- Store validation loss
+        #val_losses.append(val_loss)  # <--- Store validation loss
+
+        val_losses.append(val_loss)
+        val_accuracies.append(val_acc)
 
         writer.add_scalar('Validation Loss', val_loss, epoch)
         writer.add_scalar('Validation Accuracy', val_acc, epoch)
@@ -218,37 +212,63 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
 
     model.load_state_dict(best_model_wts)
 
-    # Plot losses
-    plt.figure(figsize=(10, 5))
-    plt.plot(range(num_epochs), train_losses, label='Training Loss')
-    plt.plot(range(num_epochs), val_losses, label='Validation Loss')
+
+    stats = {
+        "train_loss": train_losses,
+        "val_loss": val_losses,
+        "train_accuracy": train_accuracies,
+        "val_accuracy": val_accuracies
+    }
+    with open(os.path.join(results_dir, "training_stats.json"), "w") as f:
+        json.dump(stats, f)
+
+  # === Plot Loss and Accuracy Curves ===
+    epochs = range(1, num_epochs + 1)
+
+    # Plot training and validation accuracy
+    
+ # Loss plot
+    plt.subplot(1, 2, 1)
+    plt.plot(epochs, train_losses, label='Train Loss')
+    plt.plot(epochs, val_losses, label='Val Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
-    plt.title('Training and Validation Loss per Epoch')
+    plt.title('Training and Validation Loss')
     plt.legend()
     plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(os.path.join(checkpoint_path, "loss_curve.png"))  # Save plot
-    plt.show()
 
+    # Accuracy plot
+    plt.subplot(1, 2, 2)
+    plt.plot(epochs, train_accuracies, label='Train Acc')
+    plt.plot(epochs, val_accuracies, label='Val Acc')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    plt.title('Training and Validation Accuracy')
+    plt.legend()
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(results_dir, "loss_accuracy_curves.png"))
+    plt.show()
     return model
 
 
 def main():
-    writer = SummaryWriter(checkpoint_path)
+    log_dir = os.path.join("runs", "experiment_" + datetime.now().strftime("%Y%m%d_%H%M%S"))
+    writer = SummaryWriter(log_dir=log_dir)
 
     data_dir = data_path
     train_loader, val_loader = get_data_loaders(
         data_dir, batch_size, num_img_per_class, image_size)
 
-    model = models.efficientnet_v2_l(pretrained=False)
+    model = models.efficientnet_v2_m(pretrained=False) # Change to 'efficientnet_v2_m' for better performance
     num_ftrs = model.classifier[1].in_features
     model.classifier[1] = nn.Linear(num_ftrs, num_classes)
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
     # Using AdamW optimizer for better performance
-    optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=0.0001, weight_decay=1e-4)
 
     scheduler = OneCycleLR(optimizer, max_lr=0.01, steps_per_epoch=len(
         train_loader), epochs=num_epochs)

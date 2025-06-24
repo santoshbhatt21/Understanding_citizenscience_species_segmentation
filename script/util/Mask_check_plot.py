@@ -8,8 +8,8 @@ import shutil
 
 # Define background value and two colors for the binary mask
 BACKGROUND_VALUE = 10  # Change this if your background value is different
-bg_color = '#BBBD22'
-fg_color = '#16417C'
+bg_color = "#66CCE9"
+fg_color = "#E0150B"
 cmap = mcolors.ListedColormap([bg_color, fg_color])
 
 # Path to the folder containing images and masks
