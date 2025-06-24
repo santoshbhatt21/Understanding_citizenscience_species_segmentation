@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 # Setup base directory and parameters
 base_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
 Threshold_value = 150
-No_of_sampled_points = 3
+No_of_sampled_points = 10
 No_classes = 10
-Batch_size = 10  # Adjust batch size based on your GPU capacity
+Batch_size = 16  # Adjust batch size based on your GPU capacity
 Background_class = 120 
 Contour_line_size = 2
 Point_radius = 5
@@ -155,6 +155,8 @@ def process_folder(subdir, folder_idx, Threshold_value, No_of_sampled_points):
 
         for i in range(0, len(sampled_image_paths), Batch_size):
             batch_paths = sampled_image_paths[i:i + Batch_size]
+            if len(batch_paths) > 0:
+                logger.info(f"Processing batch {i // Batch_size + 1} for folder {subdir} with {len(batch_paths)} images.")
             process_images_in_batch(batch_paths, target_class, Threshold_value, No_of_sampled_points, save_folder)
 
 if __name__ == "__main__":
