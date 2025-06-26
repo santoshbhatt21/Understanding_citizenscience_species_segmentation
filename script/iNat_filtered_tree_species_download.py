@@ -8,11 +8,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Define species list with only scientific names
 species_list = [
-    # "Abies alba",
-    # "Larix decidua",
-    # "Picea abies",
-    # "Pinus sylvestris",
-    # "Pseudotsuga menziesii",
+    "Abies alba",
+    "Larix decidua",
+    "Picea abies",
+    "Pinus sylvestris",
+    "Pseudotsuga menziesii",
     "Fagus sylvatica",
     "Quercus rubra",
     "Fraxinus excelsior",
@@ -21,7 +21,7 @@ species_list = [
 ]
 
 # Set up directories and parameters
-output_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
+output_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
 os.makedirs(output_dir, exist_ok=True)
 
 images_per_species = 2000  # Total images per species to download
@@ -65,7 +65,7 @@ def download_species_images(idx, species_name, total_species):
 
     print(
         f"\n📌 Processing species {idx}/{total_species}: {species_name} (Taxon ID: {species_id})")
-
+    
     images_to_download = images_per_species  # Target number of images
     per_page = 20  # Maximum observations per API call (if supported)
     page = 1

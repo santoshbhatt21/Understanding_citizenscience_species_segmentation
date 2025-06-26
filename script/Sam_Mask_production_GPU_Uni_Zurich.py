@@ -1,5 +1,3 @@
-
-# Add the functionality to your code that can read files recursively
 import os
 import torch
 import cv2
@@ -21,23 +19,21 @@ logger = logging.getLogger(__name__)
 # Setup base directory and parameters
 base_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
 
-Threshold_value = 150  # Medium focused with details
-No_of_sampled_points = 3
-No_classes = 10  # Number of classes in the dataset, species (folder)
-Batch_size = 10  # Adjust batch size based on your GPU capacity
+Threshold_value = 80  # Medium focused with details
+No_of_sampled_points = 2
+No_classes = 6  # 5 folders + 1 conifers (with all subfolders as one class)
+Batch_size = 32
 Background_class = 10
 
-# Load models and preprocessing
-model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point/best_model_73_0.28.pth"
+model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point/best_model_16_0.03.pth"
 sam_checkpoint = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/SAM2/sam_vit_h_4b8939.pth"
 
 patterns = tuple(['.jpg', '.png', '.JPEG', '.JPG', '.PNG', '.jpeg'])
 
-
 def initialize_model():
     global model, sam, predictor, device, transform
 
-    model = models.efficientnet_v2_m(weights=None) #use EfficientNet V2 medium model
+    model = models.efficientnet_v2_s(weights=None)
     num_ftrs = model.classifier[1].in_features
     model.classifier[1] = nn.Linear(num_ftrs, No_classes)
 
@@ -59,10 +55,9 @@ def initialize_model():
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[
-                             0.229, 0.224, 0.225]),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225]),
     ])
-
 
 def sample_points_within_contour(contour, num_points):
     rect = cv2.boundingRect(contour)
@@ -75,12 +70,10 @@ def sample_points_within_contour(contour, num_points):
     sampled_indices = random.sample(range(len(xs)), num_points)
     return [(xs[i] + rect[0], ys[i] + rect[1]) for i in sampled_indices]
 
-
 def process_images_in_batch(image_paths, target_class, threshold_value, num_sampled_points, save_folder):
     try:
         global model, predictor, transform, device
 
-        # STEP 1: Preprocessing & Activation-Based Prompting
         batch_images = []
         original_images = []
         for image_path in image_paths:
@@ -90,25 +83,20 @@ def process_images_in_batch(image_paths, target_class, threshold_value, num_samp
             batch_images.append(input_tensor)
         batch_input_tensor = torch.cat(batch_images).to(device)
 
-        # Generate activation maps using GradCAM for the given target class
         cam = GradCAM(model=model, target_layers=[model.features[-1]])
         grayscale_cams = cam(input_tensor=batch_input_tensor,
                              targets=[ClassifierOutputTarget(target_class)] * len(image_paths))
 
-        # Process each image individually
         for idx, (image_path, original_image) in enumerate(original_images):
-            # Resize activation map to original image size and threshold it
             grayscale_cam = grayscale_cams[idx]
             grayscale_cam_resized = cv2.resize(
                 grayscale_cam, original_image.size, interpolation=cv2.INTER_LINEAR)
             _, binary_map = cv2.threshold(
                 np.uint8(255 * grayscale_cam_resized), threshold_value, 255, cv2.THRESH_BINARY)
 
-            # Find contours on the binary map to extract candidate regions
             contours, _ = cv2.findContours(
                 binary_map, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-            # Sample points from the activated regions (using your helper function)
             all_sampled_points, all_input_labels = [], []
             for contour in contours:
                 sampled_points = sample_points_within_contour(
@@ -117,29 +105,23 @@ def process_images_in_batch(image_paths, target_class, threshold_value, num_samp
                 all_input_labels.extend([1] * len(sampled_points))
 
             if all_sampled_points:
-                # STEP 2: Multimask Prediction with SAM
                 predictor.set_image(np.array(original_image))
                 masks, scores, logits = predictor.predict(
                     point_coords=np.array(all_sampled_points),
                     point_labels=np.array(all_input_labels, dtype=np.int32),
-                    multimask_output=True  # Generate several candidate masks
+                    multimask_output=True
                 )
 
-                # STEP 3: Score-Based Selection & Refinement
-                # Select the mask with the highest score as the candidate for refinement
                 best_mask_index = np.argmax(scores)
                 best_mask_input = logits[best_mask_index, :, :]
 
-                # Refine the mask by feeding it back into SAM using the best mask as an input
                 refined_mask, _, _ = predictor.predict(
                     point_coords=np.array(all_sampled_points),
                     point_labels=np.array(all_input_labels, dtype=np.int32),
                     mask_input=best_mask_input[None, :, :],
-                    multimask_output=False  # Only one refined output is needed
+                    multimask_output=False
                 )
                 refined_mask = np.squeeze(refined_mask)
-
-                # Create final mask: assign target_class for the foreground and Background_class for background
                 final_mask = np.where(
                     refined_mask, target_class, Background_class).astype(np.uint8)
                 mask_save_path = os.path.join(
@@ -154,29 +136,57 @@ def process_images_in_batch(image_paths, target_class, threshold_value, num_samp
     finally:
         torch.cuda.empty_cache()
 
+def get_class_image_paths_and_savefolders(base_dir):
+    """
+    Returns a list of (class_name, image_paths, save_folder) where:
+    - Each top-level folder is a class.
+    - For folders with subfolders (like '001_conifers'), all images in all subfolders are grouped as one class,
+      and masks are saved in the corresponding subfolder under <main_folder>_mask.
+    """
+    class_image_paths = []
+    for folder in sorted(os.listdir(base_dir)):
+        folder_path = os.path.join(base_dir, folder)
+        if not os.path.isdir(folder_path):
+            continue
+        save_root = os.path.join(base_dir, f"{folder}_mask")
+        if folder.lower() == "001_conifers":
+            # Recursively walk through all subfolders
+            for root, dirs, files in os.walk(folder_path):
+                rel_root = os.path.relpath(root, folder_path)
+                save_folder = os.path.join(save_root, rel_root) if rel_root != "." else save_root
+                os.makedirs(save_folder, exist_ok=True)
+                image_paths = [os.path.join(root, fname) for fname in files if fname.lower().endswith(patterns)]
+                if image_paths:
+                    class_image_paths.append(("001_conifers", image_paths, save_folder))
+        else:
+            # Regular class: all images in this folder and subfolders
+            for root, dirs, files in os.walk(folder_path):
+                rel_root = os.path.relpath(root, folder_path)
+                save_folder = os.path.join(save_root, rel_root) if rel_root != "." else save_root
+                os.makedirs(save_folder, exist_ok=True)
+                image_paths = [os.path.join(root, fname) for fname in files if fname.lower().endswith(patterns)]
+                if image_paths:
+                    class_image_paths.append((folder, image_paths, save_folder))
+    return class_image_paths
 
-def process_folder(subdir, folder_idx, Threshold_value, No_of_sampled_points):
-    initialize_model()
-    target_class = folder_idx
-    subdir_path = os.path.join(base_dir, subdir)
-    if os.path.isdir(subdir_path):
-        save_folder = os.path.join(root, f'{subdir}_mask')
-        os.makedirs(save_folder, exist_ok=True)
-        image_paths = [os.path.join(subdir_path, image_name) for image_name in os.listdir(subdir_path) if os.path.isfile(
-            os.path.join(subdir_path, image_name)) and image_name.lower().endswith(patterns)]
-
+def process_all_folders():
+    class_image_paths = get_class_image_paths_and_savefolders(base_dir)
+    # Build class_name to class_idx mapping (order matters!)
+    class_names = []
+    for class_name, _, _ in class_image_paths:
+        if class_name not in class_names:
+            class_names.append(class_name)
+    class_name_to_idx = {name: idx for idx, name in enumerate(class_names)}
+    for class_name, image_paths, save_folder in class_image_paths:
+        class_idx = class_name_to_idx[class_name]
+        print(f"\n🟩 Class: {class_name} | Index: {class_idx} | {len(image_paths)} images")
+        initialize_model()
         for i in range(0, len(image_paths), Batch_size):
             batch_paths = image_paths[i:i + Batch_size]
-            process_images_in_batch(
-                batch_paths, target_class, Threshold_value, No_of_sampled_points, save_folder)
-
+            process_images_in_batch(batch_paths, class_idx, Threshold_value, No_of_sampled_points, save_folder)
 
 if __name__ == "__main__":
     try:
-        for root, dirs, files in os.walk(base_dir):
-            for folder_idx, subdir in enumerate(sorted(dirs)):
-                process_folder(subdir, folder_idx,
-                               Threshold_value, No_of_sampled_points)
-
+        process_all_folders()
     except Exception as e:
         logger.error(f"Error in main process: {e}")
