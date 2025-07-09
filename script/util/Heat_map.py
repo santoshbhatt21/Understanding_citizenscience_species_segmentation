@@ -64,15 +64,6 @@ def sample_points_within_contour(contour, num_points):
     sampled_indices = random.sample(range(len(xs)), num_points)
     return [(xs[i] + rect[0], ys[i] + rect[1]) for i in sampled_indices]
 
-def collect_all_images(folder_path):
-    """Recursively collect all image file paths from a folder and its subfolders."""
-    image_paths = []
-    for root, dirs, files in os.walk(folder_path):
-        for fname in files:
-            if fname.lower().endswith(patterns):
-                image_paths.append(os.path.join(root, fname))
-    return image_paths
-
 def process_images_in_batch(image_paths, target_class, Threshold_value, No_of_sampled_points, save_folder):
     try:
         global model, transform, device

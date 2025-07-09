@@ -61,12 +61,16 @@ for i, mask_class in enumerate(sorted(mask_classes)):
 
         mask_path = os.path.join(mask_folder, mask_name)
 
-        image_name = mask_name[5:-4] + ".jpg"
-        class_folder = mask_class[:-5]
-        image_path = os.path.join(data_folder, class_folder, image_name)
-
-        if not os.path.exists(image_path):
-            print(f"Image file {image_path} not found.")
+        found = False
+        for ext in [".jpg", ".png", ".jpeg"]:
+            image_name = mask_name[5:-4] + ext
+            class_folder = mask_class[:-5]
+            image_path = os.path.join(data_folder, class_folder, image_name)
+            if os.path.exists(image_path):
+                found = True
+                break
+        if not found:
+            print(f"Image file for {mask_name} not found with any extension.")
             continue
 
         image = cv2.imread(image_path)

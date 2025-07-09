@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms, models
+from torchvision.models import EfficientNet_V2_S_Weights
 from torch.utils.data import DataLoader, SubsetRandomSampler
 import numpy as np
 from tqdm import tqdm
@@ -14,6 +15,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from sklearn.utils.class_weight import compute_class_weight
+from collections import Counter
 
 # === Setup ===
 checkpoint_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point"
@@ -29,14 +31,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger()
 
 transform = transforms.Compose([
-    transforms.Resize((image_size, image_size)),
+    transforms.RandomResizedCrop(image_size, scale=(0.5, 1.0)),
     transforms.RandomHorizontalFlip(),
     transforms.RandomVerticalFlip(),
-    #transforms.ColorJitter(),
-    #transforms.RandomResizedCrop(image_size),
+    transforms.RandomRotation(30),
+    transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.2),
     transforms.ToTensor(),
     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-    #transforms.RandomErasing(p=0.2, value='random')
+    transforms.RandomErasing(p=0.4, value='random')
 ])
 
 device = torch.device(GPU_index if torch.cuda.is_available() else 'cpu')
@@ -56,7 +58,10 @@ def get_data_loaders(data_dir, batch_size, num_img_per_class, transform):
 
     for class_idx in range(len(dataset.classes)):
         class_indices = [i for i, (_, label) in enumerate(dataset.samples) if label == class_idx]
-        sampled = np.random.choice(class_indices, num_img_per_class, replace=len(class_indices) < num_img_per_class)
+        if len(class_indices) == 0:
+            # Skip this class if there are no samples
+            continue
+        sampled = np.random.choice(class_indices, min(num_img_per_class, len(class_indices)), replace=False)
         indices.extend(sampled)
         class_to_indices[class_idx] = sampled
 
@@ -69,14 +74,19 @@ def get_data_loaders(data_dir, batch_size, num_img_per_class, transform):
     np.random.shuffle(indices)
     train_size = int(0.8 * len(indices))
     train_indices, val_indices = indices[:train_size], indices[train_size:]
-
+    assert len(set(train_indices).intersection(set(val_indices))) == 0, "Train/Val overlap detected!"
     train_loader = DataLoader(dataset, batch_size=batch_size, sampler=SubsetRandomSampler(train_indices), num_workers=8)
     val_loader = DataLoader(dataset, batch_size=batch_size, sampler=SubsetRandomSampler(val_indices), num_workers=8)
 
     return train_loader, val_loader, dataset
 
 
+
 # === Training ===
+
+patience = 10
+epochs_no_improve = 0
+
 def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader, num_epochs, writer):
     best_model_wts = copy.deepcopy(model.state_dict())
     best_loss = float('inf')
@@ -138,13 +148,16 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
         if val_loss < best_loss:
             best_loss = val_loss
             best_model_wts = copy.deepcopy(model.state_dict())
+            epochs_no_improve = 0
             checkpoint_dir = checkpoint_path
             os.makedirs(checkpoint_dir, exist_ok=True)
             model_filename = f'best_model_{epoch}_{best_loss:.2f}.pth'
             torch.save(model.state_dict(), os.path.join(
                 checkpoint_dir, model_filename))
-            logger.info(
-                f"Saved best model checkpoint at epoch {epoch} with validation loss {best_loss:.2f}.")
+    else:
+        epochs_no_improve += 1
+        if epochs_no_improve >= patience:
+            logger.info(f"Early stopping at epoch {epoch} due to no improvement in validation loss.")
         # Save model for every epoch
         all_epoch_dir = os.path.join(checkpoint_path, "All_Epoch_Models")
         os.makedirs(all_epoch_dir, exist_ok=True)
@@ -202,17 +215,27 @@ def main():
 
     train_loader, val_loader, dataset = get_data_loaders(data_path, batch_size, num_img_per_class, transform)
 
+     # === Add class balance check here ===
+    from collections import Counter
+    train_labels = [dataset.samples[i][1] for i in train_loader.sampler.indices]
+    val_labels = [dataset.samples[i][1] for i in val_loader.sampler.indices]
+    print("Train class counts:", Counter(train_labels))
+    print("Val class counts:", Counter(val_labels))
+    # ====================================
     num_classes = len(dataset.classes)
     logger.info(f"\nDetected classes: {dataset.classes} (Total: {num_classes})")
 
-    model = models.efficientnet_v2_s(pretrained=True)
+    model = models.efficientnet_v2_s(weights=EfficientNet_V2_S_Weights.DEFAULT)
     in_features = model.classifier[1].in_features
-    model.classifier[1] = nn.Linear(in_features, num_classes)
+    model.classifier = nn.Sequential(
+    nn.Dropout(0.5),
+    nn.Linear(in_features, num_classes)
+)
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
-    scheduler = OneCycleLR(optimizer, max_lr=1e-3, epochs=num_epochs, steps_per_epoch=len(train_loader))
+    optimizer = optim.AdamW(model.parameters(), lr=5e-4, weight_decay=1e-4)
+    scheduler = OneCycleLR(optimizer, max_lr=5e-4, epochs=num_epochs, steps_per_epoch=len(train_loader))
 
     train_model(model, criterion, optimizer, scheduler, train_loader, val_loader, num_epochs, writer)
     writer.close()

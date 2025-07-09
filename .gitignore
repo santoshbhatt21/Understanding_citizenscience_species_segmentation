@@ -193,3 +193,30 @@ metadata.csv
 
 # exclude run files
 runs/
+
+# exclude txt files
+*.txt
+
+# exclude json files
+*.json  
+
+# exclude text document
+*.txt
+
+# exclude zip files
+*.zip
+
+# exclude .csv files
+*.csv
+
+# exclude .pt files
+*.pt
+
+# exclude .yaml files
+*.yaml
+
+# exclude .yml files
+*.yml
+
+# exclude cache files
+*.cache
