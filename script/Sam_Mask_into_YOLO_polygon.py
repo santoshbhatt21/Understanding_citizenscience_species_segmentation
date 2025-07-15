@@ -21,11 +21,11 @@ base_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmen
 
 Threshold_value = 50  # Threshold for binary mask generation
 No_of_sampled_points = 2
-No_classes = 6  # 5 folders + 1 conifers (with all subfolders as one class)
-Batch_size = 32
+No_classes = 9  # 5 folders + 1 conifers (with all subfolders as one class)
+Batch_size = 16
 Background_class = 10
 
-model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Checkpoints_4k/best_model_21_0.20.pth"
+model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Checkpoints_4k/best_model_10_0.17.pth"
 sam_checkpoint = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/SAM2/sam_vit_h_4b8939.pth"
 
 patterns = tuple(['.jpg', '.png', '.JPEG', '.JPG', '.PNG', '.jpeg'])
@@ -53,7 +53,7 @@ def initialize_model():
     predictor = SamPredictor(sam)
 
     transform = transforms.Compose([
-        transforms.Resize((256, 256)),
+        transforms.Resize((512, 512)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),

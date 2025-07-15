@@ -7,13 +7,13 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 assert torch.cuda.is_available(), "CUDA is not available. Please check your environment."
 
 # Path to your dataset YAML file
-DATA_YAML = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/YOLO/data.yaml"
+DATA_YAML = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data_Y/data.yaml"
 MODEL = "yolov8l-seg.pt"  # Consider using yolov8s or yolov8m for better performance
 
 def main():
     model = YOLO(MODEL)
     model.train(
-        data="E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/YOLO/data.yaml",
+        data="E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data_Y/data.yaml",
         epochs=50,
         imgsz=512,
         device=0,
@@ -32,7 +32,7 @@ def main():
         # Optional settings
         patience=10,
         workers=4,
-        project="segmentation_project",
+        project="segmentation_project_1",
         name="yolov8s_seg_balanced_512",
         exist_ok=True,
     )

@@ -3,11 +3,11 @@ import shutil
 import random
 
 # ========== CONFIG ========== #
-SOURCE_IMAGES = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Mask_Folders_July2"      # Folder with all .jpg/.png images
-SOURCE_LABELS = "./Mask_Folders_July2"      # Folder with all .txt YOLO polygon files
-TARGET_ROOT = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/YOLO"      # Final output dir
-SPLIT_RATIO = 0.8                 # 80% train, 20% val
-SEED = 42                         # For reproducibility
+SOURCE_IMAGES = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
+SOURCE_LABELS = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Mask_labels_July14"
+TARGET_ROOT = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/DATA_Y"
+SPLIT_RATIO = 0.8
+SEED = 42
 # ============================ #
 
 def create_dirs(base_dir):
@@ -19,15 +19,20 @@ def get_image_label_pairs(image_dir, label_dir):
     image_label_pairs = []
     for root, _, files in os.walk(image_dir):
         for img_file in files:
-            if img_file.endswith(('.jpg', '.png')):
+            if img_file.lower().endswith(('.jpg', '.jpeg', '.png')):
                 img_path = os.path.join(root, img_file)
+
+                # Preserve folder structure relative to `SOURCE_IMAGES`
                 rel_path = os.path.relpath(img_path, image_dir)
+
+                # Convert image extension to .txt for label file
                 label_file = os.path.splitext(rel_path)[0] + ".txt"
                 label_path = os.path.join(label_dir, label_file)
+
                 if os.path.exists(label_path):
                     image_label_pairs.append((img_path, label_path, rel_path))
                 else:
-                    print(f"Warning: No label found for image {img_path}")
+                    print(f"⚠️ Warning: No label for image: {rel_path}")
     return image_label_pairs
 
 def split_dataset(pairs, split_ratio=0.8):
@@ -38,30 +43,35 @@ def split_dataset(pairs, split_ratio=0.8):
 
 def copy_pairs(pairs, dst_dir, split):
     for img_path, lbl_path, rel_path in pairs:
+        # Output paths for image and label
         img_dst = os.path.join(dst_dir, "images", split, rel_path)
         lbl_dst = os.path.join(dst_dir, "labels", split, os.path.splitext(rel_path)[0] + ".txt")
+
         os.makedirs(os.path.dirname(img_dst), exist_ok=True)
         os.makedirs(os.path.dirname(lbl_dst), exist_ok=True)
-        shutil.copy(img_path, img_dst)
-        shutil.copy(lbl_path, lbl_dst)
+
+        shutil.copy2(img_path, img_dst)
+        shutil.copy2(lbl_path, lbl_dst)
 
 def main():
     print("🛠️ Preparing YOLOv8 dataset folders...")
     create_dirs(TARGET_ROOT)
 
-    print("🔍 Collecting image-label pairs...")
+    print("🔍 Collecting image-label pairs (handling nested folders)...")
     pairs = get_image_label_pairs(SOURCE_IMAGES, SOURCE_LABELS)
+    if not pairs:
+        raise RuntimeError("❌ No matching image-label pairs found. Check paths.")
 
-    print(f"✂️ Splitting dataset ({SPLIT_RATIO*100:.0f}% train)...")
+    print(f"✂️ Splitting dataset: {SPLIT_RATIO*100:.0f}% train / {100 - SPLIT_RATIO*100:.0f}% val")
     train_pairs, val_pairs = split_dataset(pairs, SPLIT_RATIO)
 
-    print("📁 Copying training files...")
+    print(f"📁 Copying {len(train_pairs)} training pairs...")
     copy_pairs(train_pairs, TARGET_ROOT, "train")
 
-    print("📁 Copying validation files...")
+    print(f"📁 Copying {len(val_pairs)} validation pairs...")
     copy_pairs(val_pairs, TARGET_ROOT, "val")
 
-    print(f"✅ Done! YOLOv8 dataset ready at: {TARGET_ROOT}/")
+    print(f"✅ Done! Dataset structured at: {TARGET_ROOT}")
 
 if __name__ == "__main__":
     main()

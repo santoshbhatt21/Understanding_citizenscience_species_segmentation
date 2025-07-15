@@ -45,20 +45,27 @@ def download_species_images(idx, species_name, total_species):
     species_dir = os.path.join(output_dir, species_name_sanitized)
     os.makedirs(species_dir, exist_ok=True)
 
+    # Count existing images (jpg, jpeg, png)
+    existing_files = [f for f in os.listdir(species_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+    num_existing = len(existing_files)
+
+    if num_existing >= images_per_species:
+        print(f"✅ {species_name} already has {num_existing} images. Skipping download.")
+        return
+
     species_id = get_taxon_id_for_species(species_name)
     if species_id is None:
         print(f"❌ No taxon found for species: {species_name}")
         return
 
     print(f"\n📌 Processing species {idx}/{total_species}: {species_name} (Taxon ID: {species_id})")
-    images_to_download = images_per_species
+    images_to_download = images_per_species - num_existing
     per_page = 200
     page = 1
     image_count = 0
     metadata_list = []
 
-    # Get set of already downloaded files
-    existing_files = set(os.listdir(species_dir))
+    existing_files_set = set(existing_files)
 
     with tqdm(total=images_to_download, desc=f"📥 Downloading {species_name}") as pbar:
         while image_count < images_to_download:
@@ -68,7 +75,7 @@ def download_species_images(idx, species_name, total_species):
                     without_term_value_id=19,
                     quality_grade='research',
                     has=['photo'],
-                    month="1,2,5,6,7,8,9,11,12", # Observations from January-February, May through September, and November-December.
+                    month="1,2,5,6,7,8,9,11,12",
                     per_page=per_page,
                     page=page
                 )
@@ -90,8 +97,7 @@ def download_species_images(idx, species_name, total_species):
                         url = photo['url'].replace('square', 'original')
                         file_name = f"obs_{obs['id']}_photo_{photo['id']}.jpg"
                         file_path = os.path.join(species_dir, file_name)
-                        if file_name in existing_files:
-                            # Skip if file already exists
+                        if file_name in existing_files_set:
                             continue
                         response = requests.get(url, stream=True)
                         if response.status_code == 200:

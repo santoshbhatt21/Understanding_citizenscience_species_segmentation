@@ -15,21 +15,24 @@ from torchvision import datasets, models, transforms
 from torchvision.models import EfficientNet_V2_L_Weights, EfficientNet_V2_S_Weights
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.tensorboard import SummaryWriter
-from PIL import Image
+from PIL import Image, ImageFile, UnidentifiedImageError
 from collections import Counter
 
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ===================== Config =====================
 data_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
-checkpoint_path = "./Chekpoints_4k"
-batch_size = 32
-image_size = 256  # Adjust based on your dataset
+checkpoint_path = "./Checkpoints_4k"
+os.makedirs(checkpoint_path, exist_ok=True)  # ensures directory exists
+
+batch_size = 16
+image_size = 512  # Adjust based on your dataset
 num_img_per_class = 4000
-num_classes = 6  # Adjust based on your dataset
-num_epochs = 30
-patience = 10
+num_classes = 9  # Adjust based on your dataset
+num_epochs = 100
+patience = 10  # Early stopping patience
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Augmentation
@@ -59,31 +62,45 @@ class RecursiveImageFolder(Dataset):
         self.samples = []
         self.class_to_idx = {}
         self.transform = transform
-        
-        # Each top-level folder is a class
+
         for idx, class_name in enumerate(sorted(os.listdir(root))):
             class_path = os.path.join(root, class_name)
             if not os.path.isdir(class_path):
                 continue
             self.class_to_idx[class_name] = idx
-            # Recursively find all images in this class folder and subfolders
             for dirpath, _, filenames in os.walk(class_path):
                 for fname in filenames:
                     if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
                         self.samples.append((os.path.join(dirpath, fname), idx))
-        self.classes = list(self.class_to_idx.keys())  
-
+        self.classes = list(self.class_to_idx.keys())
         print("Class to idx mapping:", self.class_to_idx)
         print("Images per class:", Counter([label for _, label in self.samples]))
+
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        path, label = self.samples[idx]
-        img = Image.open(path).convert("RGB")
-        if self.transform:
-            img = self.transform(img)
-        return img, label
+        max_attempts = 10
+        attempts = 0
+
+        while attempts < max_attempts:
+            path, label = self.samples[idx]
+            try:
+                with Image.open(path) as img:
+                    img = img.convert("RGB")
+                    if self.transform:
+                        img = self.transform(img)
+                    return img, label
+            except (OSError, UnidentifiedImageError) as e:
+                logger.warning(f"Skipping corrupted image: {path} ({e})")
+                # Try next image
+                idx = (idx + 1) % len(self.samples)
+                attempts += 1
+
+        raise RuntimeError(f"Too many corrupted images around index {idx}")
+
+
+
 
 def get_data_loaders(data_dir, batch_size, num_img_per_class, train_transform, val_transform):
     full_dataset = RecursiveImageFolder(root=data_dir)
@@ -157,7 +174,7 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
             loss = criterion(outputs, labels)
-            scheduler.step(loss)
+            #scheduler.step(loss)
 
             val_loss += loss.item() * inputs.size(0)
             _, preds = torch.max(outputs, 1)
