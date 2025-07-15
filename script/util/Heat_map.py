@@ -16,8 +16,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Parameters
-base_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
-Threshold_value = 80
+base_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
+Threshold_value = 50
 No_of_sampled_points = 2
 No_classes = 6  # Number of main folders/classes
 Batch_size = 32
@@ -30,7 +30,7 @@ contour_thickness = 7
 point_color = (0, 0, 0)
 point_radius = 10
 
-model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point/best_model_16_0.03.pth"
+model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Checkpoints_4k/best_model_24_0.20.pth"
 patterns = tuple(['.jpg', '.png', '.JPEG', '.JPG', '.PNG', '.jpeg'])
 
 def initialize_model():

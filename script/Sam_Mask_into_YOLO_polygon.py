@@ -17,15 +17,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Setup base directory and parameters
-base_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
+base_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
 
-Threshold_value = 80  # Medium focused with details
+Threshold_value = 50  # Threshold for binary mask generation
 No_of_sampled_points = 2
 No_classes = 6  # 5 folders + 1 conifers (with all subfolders as one class)
 Batch_size = 32
 Background_class = 10
 
-model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/checkpoints/best_model_47_0.22.pth"
+model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Checkpoints_4k/best_model_21_0.20.pth"
 sam_checkpoint = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/SAM2/sam_vit_h_4b8939.pth"
 
 patterns = tuple(['.jpg', '.png', '.JPEG', '.JPG', '.PNG', '.jpeg'])
@@ -174,7 +174,7 @@ def process_images_in_batch(image_paths, target_class, threshold_value, num_samp
         logger.error(f"Error processing images in batch: {e}")
     finally:
         torch.cuda.empty_cache()
-
+    print("target_class:", target_class, "Background_class:", Background_class)
 def get_class_image_paths_and_savefolders(base_dir):
     """
     Returns a list of (class_name, image_paths, save_folder) where:

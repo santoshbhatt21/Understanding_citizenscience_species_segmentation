@@ -13,7 +13,7 @@ fg_color = "#0A55EC"
 cmap = mcolors.ListedColormap([bg_color, fg_color])
 
 # Path to the folder containing images and masks
-data_folder = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
+data_folder = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
 
 # Get list of class folders
 class_folders = os.listdir(data_folder)

@@ -10,24 +10,26 @@ import torch.nn as nn
 from collections import Counter
 import torch.optim as optim
 from torch.optim.lr_scheduler import OneCycleLR
-from torch.utils.data import DataLoader, SubsetRandomSampler
+from torch.utils.data import DataLoader, SubsetRandomSampler, Dataset
 from torchvision import datasets, models, transforms
-from torchvision.models import EfficientNet_V2_S_Weights
+from torchvision.models import EfficientNet_V2_L_Weights, EfficientNet_V2_S_Weights
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.tensorboard import SummaryWriter
+from PIL import Image
+from collections import Counter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ===================== Config =====================
-data_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
-checkpoint_path = "./checkpoints"
+data_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
+checkpoint_path = "./Chekpoints_4k"
 batch_size = 32
-image_size = 256
-num_img_per_class = 2000
+image_size = 256  # Adjust based on your dataset
+num_img_per_class = 4000
 num_classes = 6  # Adjust based on your dataset
-num_epochs = 100
-patience = 15
+num_epochs = 30
+patience = 10
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Augmentation
@@ -52,13 +54,47 @@ val_transform = transforms.Compose([
 ])
 
 # ===================== Data Loading =====================
+class RecursiveImageFolder(Dataset):
+    def __init__(self, root, transform=None):
+        self.samples = []
+        self.class_to_idx = {}
+        self.transform = transform
+        
+        # Each top-level folder is a class
+        for idx, class_name in enumerate(sorted(os.listdir(root))):
+            class_path = os.path.join(root, class_name)
+            if not os.path.isdir(class_path):
+                continue
+            self.class_to_idx[class_name] = idx
+            # Recursively find all images in this class folder and subfolders
+            for dirpath, _, filenames in os.walk(class_path):
+                for fname in filenames:
+                    if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        self.samples.append((os.path.join(dirpath, fname), idx))
+        self.classes = list(self.class_to_idx.keys())  
+
+        print("Class to idx mapping:", self.class_to_idx)
+        print("Images per class:", Counter([label for _, label in self.samples]))
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        path, label = self.samples[idx]
+        img = Image.open(path).convert("RGB")
+        if self.transform:
+            img = self.transform(img)
+        return img, label
+
 def get_data_loaders(data_dir, batch_size, num_img_per_class, train_transform, val_transform):
-    full_dataset = datasets.ImageFolder(root=data_dir)
+    full_dataset = RecursiveImageFolder(root=data_dir)
 
     indices = []
-    for class_idx in range(len(full_dataset.classes)):
+    for class_idx in range(len(full_dataset.class_to_idx)):
         class_indices = [i for i, (_, label) in enumerate(full_dataset.samples) if label == class_idx]
-        sampled = np.random.choice(class_indices, min(num_img_per_class, len(class_indices)), replace=False)
+        if num_img_per_class is None:
+            sampled = class_indices
+        else:
+            sampled = np.random.choice(class_indices, min(num_img_per_class, len(class_indices)), replace=False)
         indices.extend(sampled)
 
     np.random.shuffle(indices)
@@ -71,8 +107,8 @@ def get_data_loaders(data_dir, batch_size, num_img_per_class, train_transform, v
     print("Train class counts:", Counter(train_labels))
     print("Val class counts:", Counter(val_labels))
 
-    train_dataset = datasets.ImageFolder(root=data_dir, transform=train_transform)
-    val_dataset = datasets.ImageFolder(root=data_dir, transform=val_transform)
+    train_dataset = RecursiveImageFolder(root=data_dir, transform=train_transform)
+    val_dataset = RecursiveImageFolder(root=data_dir, transform=val_transform)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=SubsetRandomSampler(train_indices), num_workers=8)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, sampler=SubsetRandomSampler(val_indices), num_workers=8)

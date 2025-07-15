@@ -10,7 +10,7 @@ BACKGROUND_VALUE = 10
 bg_color = "#86BFBA"
 fg_color = "#0A55EC"
 cmap = mcolors.ListedColormap([bg_color, fg_color])
-data_folder = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/iNaturalist"
+data_folder = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
 num_examples = 4  # Number of images per subfolder to plot
 max_subplots = 160  # Maximum number of subplots per figure
 
