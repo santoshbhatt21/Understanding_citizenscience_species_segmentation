@@ -1,0 +1,47 @@
+from ultralytics import YOLO
+import cv2
+import torch
+import os
+from glob import glob
+
+# ---- Load your model ----
+model = YOLO("E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/segmentation_project_2/yolov8s_seg_balanced_512/weights/best.pt")
+
+# ---- Input and output folders ----
+img_folder = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Photos"
+output_folder = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Photos_RESULTS"
+os.makedirs(output_folder, exist_ok=True)
+
+# ---- Get all image files ----
+patterns = ('*.jpg', '*.png', '*.jpeg', '*.JPG', '*.PNG', '*.JPEG')
+img_paths = []
+for pat in patterns:
+    img_paths.extend(glob(os.path.join(img_folder, pat)))
+
+# ---- Run inference on each image ----
+for img_path in img_paths:
+    results = model(img_path, conf=0.25, iou=0.5, show=False)
+    base_name = os.path.splitext(os.path.basename(img_path))[0]
+
+    for idx, result in enumerate(results):
+        # Save result image with boxes/masks
+        result_img = result.plot()
+        out_img_path = os.path.join(output_folder, f"{base_name}_result.jpg")
+        cv2.imwrite(out_img_path, result_img)
+
+        # Save mask(s) if available
+        if result.masks is not None:
+            masks = result.masks.data.cpu().numpy()
+            for m_idx, mask in enumerate(masks):
+                mask_path = os.path.join(output_folder, f"{base_name}_mask{m_idx}.png")
+                cv2.imwrite(mask_path, (mask * 255).astype("uint8"))
+
+        # Print info
+        print(f"Processed: {img_path}")
+        print("Classes:", result.names)
+        print("Boxes:", result.boxes.xyxy)
+        print("Classes:", result.boxes.cls)
+        print("Masks shape:", result.masks.data.shape if result.masks is not None else "No masks")
+        if result.boxes.conf is not None and len(result.boxes.conf) > 0:
+            conf = result.boxes.conf[0].item()
+            print(f"Confidence: {conf:.2f}")

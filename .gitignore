@@ -175,6 +175,10 @@ cython_debug/
 *.jpg
 *.jpeg
 *.gif
+*.HEIC
+*.tiff 
+*.bmp
+*.webp
 
 # exclude csv metadata files
 metadata.csv
@@ -220,3 +224,24 @@ runs/
 
 # exclude cache files
 *.cache
+
+# exclude .pth files
+*.pth
+
+# exclude videos
+*.MOV
+*.mp4
+*.avi  
+*.mkv
+*.webm
+
+# exclude audio files
+*.mp3
+*.wav
+*.flac
+
+# exclude rtk files
+*.rtk
+*.mrk
+*.SIG
+*.db

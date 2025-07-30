@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from PIL import Image
 from torchvision import models, transforms
-from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam import HiResCAM
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from segment_anything import sam_model_registry, SamPredictor
 import random
@@ -19,13 +19,14 @@ logger = logging.getLogger(__name__)
 # Setup base directory and parameters
 base_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
 
-Threshold_value = 50  # Threshold for binary mask generation
+Threshold_value = 150  # Threshold for binary mask generation
 No_of_sampled_points = 2
 No_classes = 9  # 5 folders + 1 conifers (with all subfolders as one class)
 Batch_size = 16
 Background_class = 10
+torch.backends.cudnn.benchmark = True
 
-model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Checkpoints_4k/best_model_10_0.17.pth"
+model_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Checkpoints_4k/best_model_36_0.60.pth"
 sam_checkpoint = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/SAM2/sam_vit_h_4b8939.pth"
 
 patterns = tuple(['.jpg', '.png', '.JPEG', '.JPG', '.PNG', '.jpeg'])
@@ -35,7 +36,8 @@ def initialize_model():
 
     model = models.efficientnet_v2_s(weights=None)
     num_ftrs = model.classifier[1].in_features
-    model.classifier[1] = nn.Linear(num_ftrs, No_classes)
+    model.classifier = nn.Sequential(nn.Dropout(0.6), nn.Linear(num_ftrs, No_classes))
+
 
     checkpoint = torch.load(model_path, map_location='cpu')
     new_state_dict = OrderedDict()
@@ -75,6 +77,10 @@ def mask_to_yolo_polygon(mask_path, class_id, save_txt_path):
     """
     Converts a mask image to YOLO polygon format and saves as a .txt file.
     """
+    import os
+    import cv2
+    import numpy as np
+
     mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
     if mask is None:
         print(f"Could not read mask: {mask_path}")
@@ -115,7 +121,7 @@ def process_images_in_batch(image_paths, target_class, threshold_value, num_samp
             batch_images.append(input_tensor)
         batch_input_tensor = torch.cat(batch_images).to(device)
 
-        cam = GradCAM(model=model, target_layers=[model.features[-1]])
+        cam = HiResCAM(model=model, target_layers=[model.features[-1]])
         grayscale_cams = cam(input_tensor=batch_input_tensor,
                              targets=[ClassifierOutputTarget(target_class)] * len(image_paths))
 

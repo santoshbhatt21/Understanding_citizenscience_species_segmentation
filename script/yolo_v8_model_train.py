@@ -4,8 +4,8 @@ import random
 
 # ========== CONFIG ========== #
 SOURCE_IMAGES = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
-SOURCE_LABELS = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Mask_labels_July14"
-TARGET_ROOT = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/DATA_Y"
+SOURCE_LABELS = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Mask_labels_July17"
+TARGET_ROOT = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/DATA_YOLOv8"
 SPLIT_RATIO = 0.8
 SEED = 42
 # ============================ #

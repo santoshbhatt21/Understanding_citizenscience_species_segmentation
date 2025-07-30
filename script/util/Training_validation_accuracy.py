@@ -2,7 +2,7 @@ import os
 import re
 import matplotlib.pyplot as plt
 
-folder_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Check_Point/All_Epoch_Models"  # adjust this path
+folder_path = "E:\Santosh_master_thesis\Checkpoints_using_tree_species_classification_code\All_Epoch_Models"  # adjust this path
 
 train_acc = {}
 val_acc = {}

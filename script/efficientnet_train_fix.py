@@ -31,7 +31,7 @@ batch_size = 16
 image_size = 512  # Adjust based on your dataset
 num_img_per_class = 4000
 num_classes = 9  # Adjust based on your dataset
-num_epochs = 100
+num_epochs = 30
 patience = 10  # Early stopping patience
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -148,14 +148,16 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
         # Train
         model.train()
         running_loss, correct, total = 0.0, 0, 0
+        
         for inputs, labels in tqdm(train_loader, desc=f"Training Epoch {epoch+1}"):
             inputs, labels = inputs.to(device), labels.to(device)
-            optimizer.zero_grad()
+            optimizer.zero_grad()  # Reset gradients   
             outputs = model(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            scheduler.step()
+            #scheduler.step(loss)
+
 
             running_loss += loss.item() * inputs.size(0)
             _, preds = torch.max(outputs, 1)
@@ -166,14 +168,16 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
         train_acc = correct / total
         train_losses.append(train_loss)
         train_accuracies.append(train_acc)
+        print(f"Train Loss: {train_loss:.4f} | Train Accuracy: {train_acc:.4f}")
 
         # Validate
         model.eval()
         val_loss, val_correct, val_total = 0.0, 0, 0
-        for inputs, labels in tqdm(val_loader, desc=f"Validation Epoch {epoch+1}"):
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
+        with torch.no_grad():
+            for inputs, labels in tqdm(val_loader, desc=f"Validation Epoch {epoch+1}"):
+                inputs, labels = inputs.to(device), labels.to(device)
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
             #scheduler.step(loss)
 
             val_loss += loss.item() * inputs.size(0)
@@ -185,8 +189,9 @@ def train_model(model, criterion, optimizer, scheduler, train_loader, val_loader
         val_acc = val_correct / val_total
         val_losses.append(val_loss)
         val_accuracies.append(val_acc)
-        #scheduler.step(val_loss)
-
+        scheduler.step(val_loss)
+        print(f"Val Loss: {val_loss:.4f} | Val Accuracy: {val_acc:.4f}")
+        # Log to TensorBoard
         writer.add_scalar("Loss/Train", train_loss, epoch)
         writer.add_scalar("Loss/Val", val_loss, epoch)
         writer.add_scalar("Acc/Train", train_acc, epoch)
@@ -243,14 +248,17 @@ def main():
     model = models.efficientnet_v2_s(weights=EfficientNet_V2_S_Weights.DEFAULT)
     in_features = model.classifier[1].in_features
     model.classifier = nn.Sequential(
-        nn.Dropout(0.5),
+        nn.Dropout(0.6),
         nn.Linear(in_features, num_classes)
     )
     model.to(device)
 
-    criterion = nn.CrossEntropyLoss(weight=class_weights_tensor)
+    criterion = nn.CrossEntropyLoss(weight=class_weights_tensor, label_smoothing=0.1)
+    #criterion = nn.CrossEntropyLoss(weight=class_weights_tensor)
     optimizer = optim.AdamW(model.parameters(), lr=2e-4, weight_decay=5e-4)
-    scheduler = OneCycleLR(optimizer, max_lr=2e-4, epochs=num_epochs, steps_per_epoch=len(train_loader))
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
+    #scheduler = OneCycleLR(optimizer, max_lr=2e-4, steps_per_epoch=len(train_loader), epochs=num_epochs)
+
 
     train_model(model, criterion, optimizer, scheduler, train_loader, val_loader, num_epochs, writer)
     writer.close()
