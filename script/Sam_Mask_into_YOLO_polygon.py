@@ -2,6 +2,7 @@ import os
 import torch
 import cv2
 import numpy as np
+import numpy as np
 from PIL import Image
 from torchvision import models, transforms
 from pytorch_grad_cam import HiResCAM
@@ -77,9 +78,6 @@ def mask_to_yolo_polygon(mask_path, class_id, save_txt_path):
     """
     Converts a mask image to YOLO polygon format and saves as a .txt file.
     """
-    import os
-    import cv2
-    import numpy as np
 
     mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
     if mask is None:

@@ -3,7 +3,7 @@ import csv
 import shutil
 
 # === CONFIG ===
-csv_path = "E:/Santosh_master_thesis/prediction_metadata.csv"  # Path to your metadata CSV
+csv_path = "E:/Santosh_master_thesis/prediction_metadata_LOT.csv"  # Path to your metadata CSV
 output_root = "./Species_folder_sorted_images"         # Where to copy sorted images
 
 os.makedirs(output_root, exist_ok=True)
