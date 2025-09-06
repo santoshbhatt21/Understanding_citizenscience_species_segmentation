@@ -5,7 +5,7 @@ import json
 import copy
 import logging
 from collections import Counter
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import AdamW
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.swa_utils import AveragedModel, SWALR, update_bn
 
@@ -43,8 +43,9 @@ logger = logging.getLogger(__name__)
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # Set these two paths
-data_path = r"E:/Santosh_master_thesis/LOT_flat_10_species"  # dataset root
-checkpoint_dir = r"E:/Santosh_master_thesis/Checkpoints_LOT_two_stages_10_species_640"
+# Use the flat 20-class output from organs_folders_from_metadata.py
+data_path = r"E:/Santosh_master_thesis/LT_species_organ_10_species"  # dataset root (flat 20 classes)
+checkpoint_dir = r"E:/Santosh_master_thesis/Checkpoints_species_organ_weighted_random_sampler_focal_loss"
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 os.makedirs(checkpoint_dir, exist_ok=True)
@@ -52,18 +53,24 @@ os.makedirs(checkpoint_dir, exist_ok=True)
 # Training params
 batch_size = 12
 image_size = 640
-num_epochs_total = 35     # total epochs across both stages
+num_epochs_total = 50     # total epochs across both stages
 HEAD_EPOCHS = 4           # stage 1: head-only epochs
-UNFREEZE_BLOCKS = 4      # stage 4: unfreeze last K blocks
-patience = 7            # early stopping patience per stage
+UNFREEZE_BLOCKS = 6      # stage 4: unfreeze last K blocks
+patience = 10            # early stopping patience per stage
 seed = 42
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # LRs / regularization
-HEAD_LR = 5e-4           # safer head LR
-BACKBONE_LR = 7e-5       # reduced backbone LR
+HEAD_LR = 1e-4           # safer head LR
+BACKBONE_LR = 2e-5       # reduced backbone LR
 weight_decay = 5e-4
 label_smoothing = 0.02
+
+# ===== Imbalance handling =====
+USE_WEIGHTED_SAMPLER = True     # balanced batches for training
+LOSS_TYPE = "focal"             # "ce" | "ce_weighted" | "focal"
+FOCAL_GAMMA = 2.0               # focusing parameter (1.0–2.0 good)
+FOCAL_ALPHA_FROM_COUNTS = True  # use inverse-freq as alpha for focal
 
 # Best model naming preference: "loss", "acc" or "f1"
 BEST_NAMING_METRIC = "loss"
@@ -74,6 +81,18 @@ RENAME_EPOCH_FOLDER = False
 USE_SWA = True
 SWA_EPOCHS = 5
 SWA_LR = 5e-5
+
+# =========================
+# Plotting config (confusion matrix)
+# =========================
+# Tune these if labels overlap or numbers are too small/large
+CM_FIG_SIZE: Tuple[int, int] = (18, 14)
+CM_TITLE_FS: int = 20
+CM_AXIS_LABEL_FS: int = 18
+CM_TICK_FS: int = 14
+CM_NUMBER_FS: int = 12
+CM_CBAR_FS: int = 10
+CM_XTICK_ROT: int = 45
 
 # =========================
 # Transforms (no upsampling)
@@ -105,12 +124,96 @@ val_transform = transforms.Compose([
 # =========================
 
 
-class RecursiveImageFolder(datasets.ImageFolder):
-    def __init__(self, root, transform=None):
-        super().__init__(root, transform)
-        logger.info(f"Class mapping: {self.class_to_idx}")
+class OrganSpeciesDataset(torch.utils.data.Dataset):
+    """
+    Flat 20-class default (no hierarchical):
+      root/
+        Abies alba leaves/ *.jpg
+        Abies alba trunks/ *.jpg
+        ... (20 folders)
+    Class names are exactly the folder names.
+
+    Optionally supports hierarchical if prefer_flat=False:
+      root/Leaves/<species>/*.jpg, root/Trunks/<species>/*.jpg
+    """
+
+    def __init__(self, root: str, include_organs: Optional[List[str]] = None, transform=None, prefer_flat: bool = True):
+        super().__init__()
+        self.root = root
+        self.transform = transform
+        self.include_organs = include_organs or ["Leaves", "Trunks"]
+        self.extensions = (".jpg", ".jpeg", ".png")
+
+        classes: List[str] = []
+        class_to_idx: dict = {}
+        samples: List[tuple] = []
+
+        # Choose layout
+        has_hier = any(os.path.isdir(os.path.join(self.root, d)) for d in ("Leaves", "Trunks"))
+
+        if not prefer_flat and has_hier:
+            for organ in self.include_organs:
+                organ_dir = os.path.join(self.root, organ)
+                if not os.path.isdir(organ_dir):
+                    continue
+                for species in sorted(os.listdir(organ_dir)):
+                    sp_dir = os.path.join(organ_dir, species)
+                    if not os.path.isdir(sp_dir):
+                        continue
+                    class_name = f"{species} {organ.lower()}"
+                    if class_name not in class_to_idx:
+                        class_to_idx[class_name] = len(classes)
+                        classes.append(class_name)
+                    cls_idx = class_to_idx[class_name]
+                    # Walk recursively and collect images
+                    for dirpath, _, filenames in os.walk(sp_dir):
+                        for fname in filenames:
+                            if fname.lower().endswith(self.extensions):
+                                samples.append((os.path.join(dirpath, fname), cls_idx))
+        else:
+            # Flat layout: each subfolder under root is a class folder
+            for class_folder in sorted(os.listdir(self.root)):
+                class_dir = os.path.join(self.root, class_folder)
+                if not os.path.isdir(class_dir):
+                    continue
+                class_name = class_folder
+                if class_name not in class_to_idx:
+                    class_to_idx[class_name] = len(classes)
+                    classes.append(class_name)
+                cls_idx = class_to_idx[class_name]
+                for dirpath, _, filenames in os.walk(class_dir):
+                    for fname in filenames:
+                        if fname.lower().endswith(self.extensions):
+                            samples.append((os.path.join(dirpath, fname), cls_idx))
+
+        self.classes = classes
+        self.class_to_idx = class_to_idx
+        self.samples = samples
+
+        logger.info(f"Num classes: {len(self.classes)}")
+        logger.info(f"Example classes: {self.classes[:8]}")
         counts = Counter([s[1] for s in self.samples])
         logger.info(f"Samples per class (all data): {counts}")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        path, label = self.samples[idx]
+        # Robust image open with retries
+        from PIL import Image, UnidentifiedImageError
+        for _ in range(5):
+            try:
+                with Image.open(path) as img:
+                    img = img.convert("RGB")
+                    if self.transform:
+                        img = self.transform(img)
+                    return img, label
+            except (OSError, UnidentifiedImageError):
+                idx = (idx + 1) % len(self.samples)
+                path, label = self.samples[idx]
+        raise RuntimeError(
+            f"Corrupted image or read error at index {idx}: {path}")
 
 # =========================
 # Data loaders (80/20 split, no upsampling)
@@ -118,33 +221,105 @@ class RecursiveImageFolder(datasets.ImageFolder):
 
 
 def get_data_loaders(data_dir: str, batch: int):
-    base = RecursiveImageFolder(data_dir, transform=None)
+    base = OrganSpeciesDataset(data_dir, transform=None, prefer_flat=True)
     targets = [s[1] for s in base.samples]
 
     sss = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=seed)
     train_idx, val_idx = next(sss.split(np.zeros(len(targets)), targets))
 
     train_counts = Counter([targets[i] for i in train_idx])
-    val_counts = Counter([targets[i] for i in val_idx])
-    logger.info(
-        f"Split totals -> Train: {len(train_idx)} | Val: {len(val_idx)}")
+    val_counts   = Counter([targets[i] for i in val_idx])
+    logger.info(f"Split totals -> Train: {len(train_idx)} | Val: {len(val_idx)}")
     logger.info(f"Train class counts: {train_counts}")
     logger.info(f"Val class counts:   {val_counts}")
 
-    train_set = RecursiveImageFolder(data_dir, transform=train_transform)
-    val_set = RecursiveImageFolder(data_dir, transform=val_transform)
+    # Build datasets
+    train_set = OrganSpeciesDataset(data_dir, transform=train_transform, prefer_flat=True)
+    val_set   = OrganSpeciesDataset(data_dir, transform=val_transform,   prefer_flat=True)
     train_set.samples = [base.samples[i] for i in train_idx]
-    val_set.samples = [base.samples[i] for i in val_idx]
+    val_set.samples   = [base.samples[i] for i in val_idx]
 
-    train_loader = DataLoader(
-        train_set, batch_size=batch, shuffle=True,  num_workers=4, pin_memory=True)
-    val_loader = DataLoader(val_set,   batch_size=batch,
-                            shuffle=False, num_workers=4, pin_memory=True)
-    return train_loader, val_loader, base
+    # -------- Sampler (balanced) --------
+    if USE_WEIGHTED_SAMPLER:
+        num_classes = len(train_set.classes)
+        counts_arr = np.zeros(num_classes, dtype=np.float32)
+        for _, lbl in train_set.samples:
+            counts_arr[lbl] += 1
+        inv = 1.0 / np.clip(counts_arr, 1.0, None)
+        sample_weights = np.array([inv[lbl] for _, lbl in train_set.samples], dtype=np.float32)
+        sampler = WeightedRandomSampler(weights=sample_weights,
+                                        num_samples=len(sample_weights),
+                                        replacement=True)
+        shuffle_flag = False
+    else:
+        counts_arr = np.zeros(len(train_set.classes), dtype=np.float32)
+        for _, lbl in train_set.samples:
+            counts_arr[lbl] += 1
+        sampler = None
+        shuffle_flag = True
+
+    train_loader = DataLoader(train_set, batch_size=batch, sampler=sampler,
+                              shuffle=shuffle_flag, num_workers=4, pin_memory=True)
+    val_loader   = DataLoader(val_set,   batch_size=batch, shuffle=False,
+                              num_workers=4, pin_memory=True)
+
+    return train_loader, val_loader, base, counts_arr
+
 
 # =========================
 # Helpers
 # =========================
+class FocalLoss(nn.Module):
+    """
+    Multi-class Focal Loss with optional per-class alpha weights.
+    Args:
+        gamma: focusing parameter (>0). 2.0 is a common choice.
+        alpha: Tensor [C] of class weights (e.g., inverse-freq); None -> no alpha.
+        reduction: "mean" | "sum" | "none"
+        label_smoothing: same semantics as CrossEntropyLoss
+    """
+    def __init__(self, gamma: float = 2.0, alpha: Optional[torch.Tensor] = None,
+                 reduction: str = "mean", label_smoothing: float = 0.0):
+        super().__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.reduction = reduction
+        self.label_smoothing = label_smoothing
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        # CE with label smoothing -> per-sample loss
+        # (we compute focal modulation on the probabilities)
+        num_classes = logits.size(1)
+        log_probs = F.log_softmax(logits, dim=1)            # [N, C]
+        probs = log_probs.exp()                              # [N, C]
+
+        # one-hot w/ smoothing
+        with torch.no_grad():
+            true_dist = torch.zeros_like(log_probs)
+            true_dist.fill_(self.label_smoothing / (num_classes - 1))
+            true_dist.scatter_(1, targets.unsqueeze(1), 1.0 - self.label_smoothing)
+
+        # p_t = sum(one_hot * probs)
+        pt = (true_dist * probs).sum(dim=1)                 # [N]
+        # focal factor
+        focal = (1.0 - pt).clamp(min=1e-8).pow(self.gamma)  # [N]
+
+        # CE per-sample: -sum(true * log_probs)
+        ce = -(true_dist * log_probs).sum(dim=1)            # [N]
+
+        loss = focal * ce                                   # [N]
+
+        # alpha weighting by class (on targets)
+        if self.alpha is not None:
+            a = self.alpha[targets]                         # [N]
+            loss = a * loss
+
+        if self.reduction == "mean":
+            return loss.mean()
+        elif self.reduction == "sum":
+            return loss.sum()
+        else:
+            return loss
 
 
 def freeze_backbone(model: nn.Module):
@@ -178,8 +353,65 @@ def next_best_index(root_out_dir: str) -> int:
     return max_idx + 1
 
 
-def plot_confusion_matrix_png(cm: np.ndarray, labels, out_path: str, normalize: bool = False, title: Optional[str] = None):
-    plt.figure(figsize=(8, 6))
+def reorder_leaves_then_trunks(labels: List[str], cm: np.ndarray):
+    """Return labels and confusion matrix reordered as:
+    - All '... leaves' classes first (alphabetical by species name)
+    - Then all '... trunks' classes (alphabetical by species name)
+    Names are kept intact; only order changes.
+
+    If a label doesn't end with 'leaves' or 'trunks', it's appended at the end
+    in original order.
+    """
+    def species_key(name: str) -> str:
+        s = name.strip().lower()
+        s = s.replace(" leaves", "").replace(" trunks", "")
+        return s
+
+    leaves_idx = [i for i, n in enumerate(labels) if n.strip().lower().endswith("leaves")]
+    trunks_idx = [i for i, n in enumerate(labels) if n.strip().lower().endswith("trunks")]
+    other_idx = [i for i in range(len(labels)) if i not in leaves_idx and i not in trunks_idx]
+
+    leaves_sorted = sorted(leaves_idx, key=lambda i: species_key(labels[i]))
+    trunks_sorted = sorted(trunks_idx, key=lambda i: species_key(labels[i]))
+    order = leaves_sorted + trunks_sorted + other_idx
+
+    labels_ord = [labels[i] for i in order]
+    cm_ord = cm[np.ix_(order, order)] if cm is not None else None
+    return labels_ord, cm_ord
+
+
+def plot_confusion_matrix_png(
+    cm: np.ndarray,
+    labels,
+    out_path: str,
+    normalize: bool = False,
+    title: Optional[str] = None,
+    *,
+    fig_size: Tuple[int, int] = (18, 14),
+    title_fs: int = 20,
+    axis_label_fs: int = 16,
+    tick_fs: int = 10,
+    number_fs: int = 9,
+    cbar_fs: int = 10,
+    x_tick_rotation: int = 45,
+):
+    """Plot and save a confusion matrix PNG with configurable font sizes.
+
+    Args:
+        cm: Confusion matrix values (int counts).
+        labels: Class names in order.
+        out_path: Path to save the figure.
+        normalize: If True, row-normalize before plotting.
+        title: Optional plot title.
+        fig_size: Figure size in inches (w, h).
+        title_fs: Font size for the title.
+        axis_label_fs: Font size for X/Y axis labels.
+        tick_fs: Font size for tick labels.
+        number_fs: Font size for the annotated cell numbers.
+        cbar_fs: Font size for colorbar tick labels.
+        x_tick_rotation: Rotation angle for x tick labels.
+    """
+    plt.figure(figsize=fig_size)
     matrix = cm.astype(float)
     if normalize:
         with np.errstate(all='ignore'):
@@ -187,23 +419,34 @@ def plot_confusion_matrix_png(cm: np.ndarray, labels, out_path: str, normalize: 
             matrix = np.divide(matrix, row_sums, out=np.zeros_like(
                 matrix), where=row_sums != 0)
     im = plt.imshow(matrix, interpolation='nearest', cmap=plt.cm.Blues)
-    plt.colorbar(im, fraction=0.046, pad=0.04)
+    cbar = plt.colorbar(im, fraction=0.046, pad=0.04)
+    try:
+        cbar.ax.tick_params(labelsize=cbar_fs)
+    except Exception:
+        pass
     ticks = np.arange(len(labels))
-    plt.xticks(ticks, labels, rotation=45, ha='right')
-    plt.yticks(ticks, labels)
-    fmt = ".2f" if normalize else ".0f"
+    plt.xticks(ticks, labels, rotation=x_tick_rotation, ha='right', fontsize=tick_fs)
+    plt.yticks(ticks, labels, fontsize=tick_fs)
+    fmt = ".1f" if normalize else ".0f"
     thresh = (matrix.max() if matrix.size else 0) / 2.0 if matrix.size else 0
     for i in range(matrix.shape[0]):
         for j in range(matrix.shape[1]):
             val = matrix[i, j]
-            plt.text(j, i, format(val, fmt), ha="center", va="center",
-                     color="white" if val > thresh else "black")
-    plt.ylabel('True')
-    plt.xlabel('Predicted')
+            plt.text(
+                j,
+                i,
+                format(val, fmt),
+                ha="center",
+                va="center",
+                fontsize=number_fs,
+                color="white" if val > thresh else "black",
+            )
+    plt.ylabel('True', fontsize=axis_label_fs)
+    plt.xlabel('Predicted', fontsize=axis_label_fs)
     if title:
-        plt.title(title)
+        plt.title(title, fontsize=title_fs)
     plt.tight_layout()
-    plt.savefig(out_path, dpi=200)
+    plt.savefig(out_path, dpi=300)
     plt.close()
 
 
@@ -471,22 +714,83 @@ def train_model(model: nn.Module,
 
     # Final evaluation artifacts (confusion matrices + report)
     cm = confusion_matrix(y_true, y_pred, labels=list(range(len(class_names))))
+    # Reorder labels and confusion matrix: all leaves (alphabetical) first, then trunks (alphabetical)
+    class_names_ordered, cm_ordered = reorder_leaves_then_trunks(class_names, cm)
     stats_dir = os.path.join(root_out_dir, "Training_Stats")
     os.makedirs(stats_dir, exist_ok=True)
 
-    plot_confusion_matrix_png(cm, class_names, os.path.join(stats_dir, "confusion_matrix.png"),
-                              normalize=False, title="Confusion Matrix")
-    plot_confusion_matrix_png(cm, class_names, os.path.join(stats_dir, "confusion_matrix_normalized.png"),
-                              normalize=True, title="Confusion Matrix (Normalized)")
+    plot_confusion_matrix_png(
+    cm_ordered,
+    class_names_ordered,
+        os.path.join(stats_dir, "confusion_matrix.png"),
+        normalize=False,
+        title="Confusion Matrix",
+        fig_size=CM_FIG_SIZE,
+        title_fs=CM_TITLE_FS,
+        axis_label_fs=CM_AXIS_LABEL_FS,
+        tick_fs=CM_TICK_FS,
+        number_fs=CM_NUMBER_FS,
+        cbar_fs=CM_CBAR_FS,
+        x_tick_rotation=CM_XTICK_ROT,
+    )
+    plot_confusion_matrix_png(
+    cm_ordered,
+    class_names_ordered,
+        os.path.join(stats_dir, "confusion_matrix_normalized.png"),
+        normalize=True,
+        title="Confusion Matrix (Normalized)",
+        fig_size=CM_FIG_SIZE,
+        title_fs=CM_TITLE_FS,
+        axis_label_fs=CM_AXIS_LABEL_FS,
+        tick_fs=CM_TICK_FS,
+        number_fs=CM_NUMBER_FS,
+        cbar_fs=CM_CBAR_FS,
+        x_tick_rotation=CM_XTICK_ROT,
+    )
+    # Save numeric confusion matrix and labels for exact relabeling/export later
+    try:
+        cm_path = os.path.join(stats_dir, "confusion_matrix.json")
+        cmn_path = os.path.join(stats_dir, "confusion_matrix_normalized.json")
+        with open(cm_path, "w", encoding="utf-8") as f:
+            json.dump({"labels": class_names_ordered, "matrix": cm_ordered.tolist()}, f)
+        # normalized copy
+        with np.errstate(all='ignore'):
+            row_sums = cm_ordered.sum(axis=1, keepdims=True)
+            cm_norm = np.divide(cm_ordered.astype(float), row_sums, out=np.zeros_like(
+                cm_ordered, dtype=float), where=row_sums != 0)
+        with open(cmn_path, "w", encoding="utf-8") as f:
+            json.dump({"labels": class_names_ordered, "matrix": cm_norm.tolist()}, f)
+        # Save labels list exactly as used
+        try:
+            with open(os.path.join(stats_dir, "labels.txt"), "w", encoding="utf-8") as lf:
+                lf.write("\n".join(class_names_ordered))
+        except Exception:
+            pass
+    except Exception as e:
+        logger.warning(f"Failed to save confusion_matrix.json: {e}")
 
+    # Classification report should reflect the original label order to align with predictions,
+    # but for human readability we also save a version matching the reordered labels.
     report = classification_report(
         y_true, y_pred, target_names=class_names, output_dict=True)
     with open(os.path.join(stats_dir, "classification_report.json"), "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
 
+    try:
+        report_ordered = classification_report(
+            y_true, y_pred,
+            target_names=class_names_ordered,
+            output_dict=True,
+            zero_division=0,
+        )
+        with open(os.path.join(stats_dir, "classification_report_ordered.json"), "w", encoding="utf-8") as f:
+            json.dump(report_ordered, f, indent=2)
+    except Exception:
+        pass
+
     # Curves (smoothed)
     def _plot(x, ys, labels, title, ylabel, fname):
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(18, 12))
         for y, lab in zip(ys, labels):
             plt.plot(x, smooth_curve(y), label=lab)
         plt.xlabel("Epoch")
@@ -626,33 +930,38 @@ def train_model(model: nn.Module,
 
 
 def main():
-    writer = SummaryWriter(log_dir=os.path.join(
-        checkpoint_dir, "Training_Stats", "tensorboard"))
+    writer = SummaryWriter(log_dir=os.path.join(checkpoint_dir, "Training_Stats", "tensorboard"))
 
-    train_loader, val_loader, base_dataset = get_data_loaders(
-        data_path, batch_size)
-    class_names = base_dataset.classes
+    train_loader, val_loader, base_dataset, train_class_counts = get_data_loaders(data_path, batch_size)
+    class_names = [str(c).strip() for c in base_dataset.classes]
+    num_classes = len(class_names)
 
-    # Model with ImageNet weights and new head
+    # -------- Model --------
     model = models.efficientnet_v2_s(weights=EfficientNet_V2_S_Weights.DEFAULT)
     in_features = model.classifier[1].in_features
-    model.classifier = nn.Sequential(nn.Dropout(
-        0.6), nn.Linear(in_features, len(class_names)))
+    model.classifier = nn.Sequential(nn.Dropout(0.6), nn.Linear(in_features, num_classes))
     model.to(device)
 
-    # Optional class weights from TRAIN subset (helpful if imbalanced).
-    train_labels = [lbl for _, lbl in train_loader.dataset.samples]
-    counts = Counter(train_labels)
-    num_classes = len(class_names)
-    class_counts = np.array([counts.get(i, 0)
-                            for i in range(num_classes)], dtype=np.float32)
-    inv = 1.0 / np.clip(class_counts, 1.0, None)
-    weights = inv / inv.sum() * num_classes  # roughly centered around 1
-    class_weights_tensor = torch.tensor(
-        weights, dtype=torch.float32, device=device)
+    # -------- Class weights from TRAIN subset --------
+    inv = 1.0 / np.clip(train_class_counts, 1.0, None)           # inverse frequency
+    weights = inv / inv.sum() * num_classes                      # roughly centered around 1
+    class_weights_tensor = torch.tensor(weights, dtype=torch.float32, device=device)
 
-    criterion = nn.CrossEntropyLoss(
-        weight=class_weights_tensor, label_smoothing=label_smoothing)
+    # -------- Choose loss --------
+    if LOSS_TYPE == "ce":
+        criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+    elif LOSS_TYPE == "ce_weighted":
+        criterion = nn.CrossEntropyLoss(weight=class_weights_tensor, label_smoothing=label_smoothing)
+    elif LOSS_TYPE == "focal":
+        if FOCAL_ALPHA_FROM_COUNTS:
+            alpha = class_weights_tensor  # up-weight rare classes
+        else:
+            alpha = None
+        criterion = FocalLoss(gamma=FOCAL_GAMMA, alpha=alpha, reduction="mean",
+                              label_smoothing=label_smoothing)
+    else:
+        raise ValueError(f"Unknown LOSS_TYPE: {LOSS_TYPE}")
+
 
     # -------- Stage 1: freeze backbone, train head only --------
     freeze_backbone(model)

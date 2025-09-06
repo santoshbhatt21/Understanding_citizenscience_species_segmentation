@@ -35,7 +35,7 @@ os.makedirs(stats_path, exist_ok=True)
 
 batch_size = 16
 image_size = 512
-num_img_per_class = 450
+num_img_per_class = 500
 num_classes = 3
 num_epochs = 50
 patience = 5

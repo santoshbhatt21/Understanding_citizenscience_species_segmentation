@@ -1,0 +1,50 @@
+import os
+import shutil
+from pathlib import Path
+
+def copy_two_class_dataset(images_root, labels_root, output_root, keep_classes=("Leaves", "Trunks")):
+    """
+    Copy dataset into one output folder with structure:
+        output_root/
+            images/train/
+                Leaves/
+                Trunks/
+            labels/train/
+                Leaves/
+                Trunks/
+    """
+    images_root = Path(images_root)
+    labels_root = Path(labels_root)
+    output_root = Path(output_root)
+
+    dst_images = output_root / "images"
+    dst_labels = output_root / "labels"
+
+    for class_name in keep_classes:
+        # Copy images
+        src_class_images = images_root / class_name
+        dst_class_images = dst_images / class_name
+        if src_class_images.exists():
+            shutil.copytree(src_class_images, dst_class_images, dirs_exist_ok=True)
+        else:
+            print(f"⚠️ Skipping missing image folder: {src_class_images}")
+
+        # Copy labels
+        src_class_labels = labels_root / class_name
+        dst_class_labels = dst_labels / class_name
+        if src_class_labels.exists():
+            shutil.copytree(src_class_labels, dst_class_labels, dirs_exist_ok=True)
+        else:
+            print(f"⚠️ Skipping missing label folder: {src_class_labels}")
+
+    print(f"\n✅ Two-class dataset copied to {output_root}")
+    print(f"   Classes kept: {keep_classes}")
+
+
+# ---------------- run ----------------
+if __name__ == "__main__":
+    images_root = r"E:/Santosh_master_thesis/DATA_YOLOv8/images"
+    labels_root = r"E:/Santosh_master_thesis/DATA_YOLOv8_clean/labels"
+    output_root = r"E:/Santosh_master_thesis/DATA_YOLOv8_two_class"
+
+    copy_two_class_dataset(images_root, labels_root, output_root, keep_classes=("Leaves", "Trunks"))

@@ -7,7 +7,7 @@ import seaborn as sns
 
 # === Locate metrics files ===
 # Root of a checkpoint run; plots and reports live under Training_Stats/
-ckpt_root = r"E:/Santosh_master_thesis/Checkpoints_LT_organ_species_640"
+ckpt_root = r"E:/Santosh_master_thesis/Checkpoints_species_organ_weighted_random_sampler_focal_loss"
 stats_dir = os.path.join(ckpt_root, "Training_Stats")
 
 # Preferred file

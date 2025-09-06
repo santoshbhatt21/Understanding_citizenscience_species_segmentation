@@ -16,10 +16,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Parameters
-base_dir = "E:/Santosh_master_thesis/Leaves_mask"
+base_dir = "E:/Santosh_master_thesis/LT_flat_from_meta_10_species"
 Threshold_value = 150
 No_of_sampled_points = 2
-No_classes = 1  # Number of main folders/classes
+No_classes = 20  # Number of main folders/classes
 Batch_size = 32
 Background_class = 120
 Contour_line_size = 2
@@ -30,7 +30,7 @@ contour_thickness = 7
 point_color = (0, 0, 0)
 point_radius = 10
 
-model_path = "E:/Santosh_master_thesis/Checkpoints_labeled_LOT/best_model_epoch9_VL0.10.pth"
+model_path = "E:/Santosh_master_thesis/Checkpoints_LT_organ_species_640/best_model_16_0.82.pth"
 patterns = tuple(['.jpg', '.png', '.JPEG', '.JPG', '.PNG', '.jpeg'])
 
 
