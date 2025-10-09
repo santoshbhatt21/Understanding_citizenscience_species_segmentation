@@ -7,13 +7,13 @@ import random
 import shutil
 
 # Define background value and two colors for the binary mask
-BACKGROUND_VALUE = 10  # Change this if your background value is different
+BACKGROUND_VALUE = 255  # Change this if your background value is different
 bg_color = "#86BFBA"
 fg_color = "#0A55EC"
 cmap = mcolors.ListedColormap([bg_color, fg_color])
 
 # Path to the folder containing images and masks
-data_folder = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
+data_folder = "E:/Santosh_master_thesis/classified_Leaves"  # Change this to your folder path
 
 # Get list of class folders
 class_folders = os.listdir(data_folder)

@@ -1,7 +1,8 @@
 import os
 
-root_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
+root_dir = r"E:/Santosh_master_thesis/Generated_YOLO_Seg_Labels_Leaves_inverted"
 image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff')
+
 
 overall_total = 0
 

@@ -6,11 +6,11 @@ import numpy as np
 import random
 
 # Settings
-BACKGROUND_VALUE = 10
+BACKGROUND_VALUE = 255  # Change this if your background value is different
 bg_color = "#86BFBA"
 fg_color = "#0A55EC"
 cmap = mcolors.ListedColormap([bg_color, fg_color])
-data_folder = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
+data_folder = "E:/Santosh_master_thesis/classified_Leaves"  # Change this to your data folder
 num_examples = 4  # Number of images per subfolder to plot
 max_subplots = 160  # Maximum number of subplots per figure
 

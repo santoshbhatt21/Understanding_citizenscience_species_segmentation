@@ -1,10 +1,10 @@
 import os
 
 # === Root path to your sorted dataset ===
-root_dir = "E:/Santosh_master_thesis/LOT_all_images_labeled"
+root_dir = "E:/Santosh_master_thesis/Generated_YOLO_Seg_Labels_Leaves_inverted"
 
 # === Define image extensions to count ===
-image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff')
+image_extensions = ('.txt',) #('.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff')
 
 # === Count images in all subfolders ===
 total_images = 0
