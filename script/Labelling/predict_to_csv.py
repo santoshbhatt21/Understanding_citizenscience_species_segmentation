@@ -101,7 +101,7 @@ def main():
 
     # Paths
     checkpoints_dir = "E:/Santosh_master_thesis/Checkpoints_LOT_two_stages_10_species_640"
-    labeled_data_path = "E:/Santosh_master_thesis/LOT_flat_10_species"
+    labeled_data_path = "E:/Santosh_master_thesis/flat_labeled_Leaves_Others_Trunks_1500_images"
     unlabeled_data_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
     output_csv_path = "E:/Santosh_master_thesis/prediction_metadata_LOT_10_species.csv"
 

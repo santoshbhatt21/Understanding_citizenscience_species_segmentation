@@ -1,6 +1,6 @@
 import os
 
-root_dir = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Labelling_Manual"
+root_dir = "E:/Santosh_master_thesis/DATA_YOLO_11_root_structure_leaves"
 image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff')
 label_extensions = ('.txt',)
 

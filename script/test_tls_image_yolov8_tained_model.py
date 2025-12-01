@@ -3,13 +3,13 @@ import cv2
 import torch
 
 # ---- Load your model ----
-model = YOLO("E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/segmentation_project_2/yolov8s_seg_balanced_512/weights/best.pt")  # path to your trained model
+model = YOLO("E:/Santosh_master_thesis/species_segmentation/yolo11_10species_seg_final/weights/best.pt")  # path to your trained model
 
 # ---- Path to new test image (outside training/val set) ----
 img_path = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/TLS_IMAGES/250411_143717_06_01.jpg"  # Replace with your TLS image path
 
 # ---- Run inference ----
-results = model(img_path, save=True, conf=0.25, iou=0.5, show=True)
+results = model(img_path, save=True, conf=0.12, iou=0.5, show=True)
 
 # ---- Access segmentation results ----
 for result in results:

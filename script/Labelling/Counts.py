@@ -1,7 +1,7 @@
 import os
 
 # === Root path to your sorted dataset ===
-root_dir = r"E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Labelling_Manual" #"E:/Santosh_master_thesis/DATA_YOLO11_LT_clean_labels/labels"
+root_dir = r"E:/Santosh_master_thesis/DATA_YOLOv11_left_arm"
 
 # === Define image extensions to count ===
 image_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff')

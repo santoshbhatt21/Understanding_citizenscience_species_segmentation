@@ -3,9 +3,9 @@ import shutil
 import random
 
 # ========== CONFIG ========== #
-SOURCE_IMAGES = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Data"
-SOURCE_LABELS = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/Mask_labels_July17"
-TARGET_ROOT = "E:/Santosh_master_thesis/Understanding_citizenscience_species_segmentation/DATA_YOLOv8"
+SOURCE_IMAGES = "E:/Santosh_master_thesis/classified_Leaves"
+SOURCE_LABELS = "E:/Santosh_master_thesis/DATA_YOLO11_leaves_clean_labels"
+TARGET_ROOT = "E:/Santosh_master_thesis/DATA_YOLO_11_root_structure_leaves"
 SPLIT_RATIO = 0.8
 SEED = 42
 # ============================ #
